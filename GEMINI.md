@@ -2,16 +2,8 @@
 
 Use `AGENTS.md` as the canonical repository playbook.
 
-Always use:
-
-- `docs/ai/commands.md` for build, test, and validation commands
-- `docs/ai/standards.md` for repository-wide engineering rules
-
-Read these only when relevant:
-
-- `docs/ai/project-context.md`
-- `docs/ai/architecture.md`
-- `docs/ai/decisions.md`
-- `docs/ai/subagents/README.md` when splitting work across roles
-
-Keep changes small, avoid overwriting user edits without approval, and report validation results clearly.
+- Always use `docs/ai/commands.md` and `docs/ai/standards.md`.
+- Read `docs/ai/skills/index.md` before substantial edits.
+- Read `docs/ai/current-task.md` only when it contains active work.
+- Load `project-context.md`, `architecture.md`, `decisions.md`, and subagent docs only when relevant.
+- Prefer shared docs over Gemini-only context.

@@ -2,6 +2,6 @@
 
 # Claude Code Notes
 
-- Use `docs/ai/tasks/` for task-specific context that should not live in the main playbook.
-- Use `docs/ai/subagents/` when splitting work across planner, implementer, reviewer, and tester roles.
-- Prefer adding path-specific guidance in `.claude/rules/` instead of growing this file.
+- Check `docs/ai/skills/index.md` before substantial edits.
+- Read `docs/ai/current-task.md` only when it contains active work.
+- Use subagent docs only when the task benefits from explicit multi-agent coordination.

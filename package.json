@@ -2,7 +2,9 @@
   "name": "ai-coding-boilerplate",
   "private": true,
   "description": "Portable AI-coding workspace scaffold powered by pnpm.",
+  "packageManager": "pnpm@10.28.1",
   "scripts": {
+    "new": "node ./scripts/new.mjs",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "build": "pnpm -r --if-present build",

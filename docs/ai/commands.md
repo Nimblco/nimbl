@@ -1,40 +1,24 @@
 # Commands
 
-Use this file as the single place to document the best-known commands for this repository.
+Use this file as the canonical command list for the repository.
 
-Subagent roles should reference this file instead of inventing commands in prompts or handoff notes.
+## Bootstrap
 
-## Current starter commands
+- `pnpm install`
+- `./scripts/bootstrap.ps1`
+- `./scripts/bootstrap.sh`
+- `pnpm run new skill <skill-name>`
 
-### Bootstrap
-
-- PowerShell: `powershell -Command "corepack enable"`
-- PowerShell: `pnpm install`
-- PowerShell: `./scripts/bootstrap.ps1`
-- Bash: `corepack enable`
-- Bash: `pnpm install`
-- Bash: `./scripts/bootstrap.sh`
-
-### Validation
+## Validation
 
 - `pnpm run lint --if-present`
 - `pnpm test --if-present`
 - `pnpm run build --if-present`
 - `pnpm run typecheck --if-present`
-- PowerShell: `./scripts/check.ps1`
-- PowerShell with execution-policy bypass: `powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1`
-- Bash: `./scripts/check.sh`
+- `./scripts/check.ps1`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1`
+- `./scripts/check.sh`
 
-## How to evolve this file
+## When the stack becomes real
 
-Once the real app stack exists, replace this section with the actual commands for:
-
-- install
-- dev
-- lint
-- test
-- build
-- database or migrations
-- e2e or smoke tests
-
-Keep commands copy-pasteable and current.
+- replace starter commands with real install, dev, lint, test, build, database, and e2e commands
