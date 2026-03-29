@@ -10,6 +10,7 @@ These are the highest-value files to keep current:
 - `docs/ai/commands.md`: the single source of truth for build, test, and validation commands
 - `docs/ai/standards.md`: repo-wide engineering rules that should stay stable
 - `docs/ai/portability.md`: explains how to keep the setup cross-tool and non-fragile
+- `docs/specs/`, `docs/plans/`, and `docs/ai/tasks/`: the committed artifacts that preserve design intent, execution steps, and active task state across tool switches
 - `package.json` and `pnpm-workspace.yaml`: the default JS or TS workspace root
 
 ## Tool-specific files

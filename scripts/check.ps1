@@ -26,17 +26,35 @@ function Invoke-IfExists {
   return $false
 }
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$npmCache = Join-Path $repoRoot "tmp\npm-cache"
 $ranSomething = $false
 
 if (Invoke-IfExists -Path "package.json" -Label "Node.js checks" -Action {
   if (Test-Path -LiteralPath "pnpm-workspace.yaml") {
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-      pnpm run lint --if-present
-      pnpm test --if-present
-      pnpm run build --if-present
-      pnpm run typecheck --if-present
+      pnpm run lint
+      pnpm run test
+      pnpm run build
+      pnpm run typecheck
+    } elseif (Get-Command npm.cmd -ErrorAction SilentlyContinue) {
+      $originalNpmCache = $env:npm_config_cache
+      $env:npm_config_cache = $npmCache
+
+      try {
+        & npm.cmd exec --yes -- pnpm run lint
+        & npm.cmd exec --yes -- pnpm run test
+        & npm.cmd exec --yes -- pnpm run build
+        & npm.cmd exec --yes -- pnpm run typecheck
+      } finally {
+        if ($null -ne $originalNpmCache -and $originalNpmCache -ne "") {
+          $env:npm_config_cache = $originalNpmCache
+        } else {
+          Remove-Item Env:npm_config_cache -ErrorAction SilentlyContinue
+        }
+      }
     } else {
-      Write-Warning "pnpm is not installed. Skipping pnpm workspace checks."
+      Write-Warning "Neither pnpm nor npm.cmd is available. Skipping pnpm workspace checks."
     }
   } elseif (Get-Command npm -ErrorAction SilentlyContinue) {
     npm run lint --if-present

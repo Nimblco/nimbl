@@ -1,5 +1,7 @@
-# ESLint Config Package
+# Shared ESLint Config
 
-Use this package for the shared ESLint configuration across apps and packages.
+Use this package for the lint rules shared by the product apps and packages.
 
-Create a local `package.json` here when you add your lint setup.
+Keep it lean so downstream repos can extend or replace it without untangling product code.
+
+Create a local `package.json` here when the lint setup becomes real.

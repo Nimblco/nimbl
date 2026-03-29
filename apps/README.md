@@ -1,17 +1,10 @@
 # Apps Workspace
 
-Put runnable applications here.
+Put the product's runnable apps here.
 
-Examples:
+In this starter, `web` and `api` are two sides of the same product:
 
-- `apps/web`
-- `apps/api`
-- `apps/admin`
+- `apps/web` serves the customer-facing experience
+- `apps/api` supports that experience with server-side logic, data access, or BFF routes
 
-Each app should have its own `package.json`.
-
-Suggested starting layout:
-
-- `apps/web`: frontend application
-- `apps/api`: backend or BFF
-- `apps/admin`: internal dashboard if needed
+Add more apps only when the product needs them, and keep each app self-contained with its own `package.json`.

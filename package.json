@@ -1,12 +1,13 @@
 {
   "name": "ai-coding-boilerplate",
   "private": true,
-  "description": "Portable AI-coding workspace scaffold powered by pnpm.",
+  "description": "Portable agentic coding workspace scaffold powered by pnpm.",
   "scripts": {
     "lint": "pnpm -r --if-present lint",
-    "test": "pnpm -r --if-present test",
+    "test": "node --test",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "check": "powershell -ExecutionPolicy Bypass -File .\\scripts\\check.ps1"
+    "check": "powershell -ExecutionPolicy Bypass -File .\\scripts\\check.ps1",
+    "workflow": "node ./scripts/workflow.mjs"
   }
 }

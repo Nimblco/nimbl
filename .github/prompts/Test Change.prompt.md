@@ -1,6 +1,6 @@
 # Test Change
 
-Use [AGENTS.md](../../AGENTS.md), [commands.md](../../docs/ai/commands.md), and [tester.md](../../docs/ai/subagents/tester.md).
+Use [AGENTS.md](../../AGENTS.md), the current task brief, any linked spec or plan, [commands.md](../../docs/ai/commands.md), and [tester.md](../../docs/ai/subagents/tester.md).
 
 Test the current change by:
 

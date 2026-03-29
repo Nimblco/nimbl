@@ -1,12 +1,7 @@
-# API App
+# Product API
 
-Use this folder for the backend, BFF, or API service.
+Use this folder for the product backend that powers `apps/web`.
 
-Examples:
+It can host the server, BFF, data layer, or other shared product logic, depending on the stack you pick.
 
-- Express
-- Fastify
-- NestJS
-- Hono
-
-Add a local `package.json` here when you choose the framework.
+Add a local `package.json` here when the API becomes real.

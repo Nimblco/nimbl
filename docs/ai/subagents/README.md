@@ -12,9 +12,10 @@ This repository defines a shared subagent operating model so different AI tools 
 ## Default sequence
 
 1. Planner creates or updates a task brief using `docs/ai/tasks/TEMPLATE.md`.
-2. Implementer changes only the files in its assigned write scope.
-3. Reviewer checks the diff with a bug-finding mindset.
-4. Tester runs the best available validation and reports results.
+2. If the task changes behavior, architecture, workflow, or spans multiple steps, the planner also creates or updates the matching spec in `docs/specs/` and plan in `docs/plans/`.
+3. Implementer reads the task brief and any linked spec or plan before changing files inside its assigned write scope.
+4. Reviewer checks the diff against the same artifacts with a bug-finding mindset.
+5. Tester runs the best available validation and reports results against the same scope.
 
 ## Parallel work rules
 
@@ -22,6 +23,13 @@ This repository defines a shared subagent operating model so different AI tools 
 - if one role depends on another role's output, keep that step on the critical path
 - planner should assign ownership before implementation begins
 - reviewer and tester should avoid making broad code changes unless explicitly asked
+
+## Artifact rules
+
+- every non-trivial change needs a task brief
+- behavior, architecture, workflow, or multi-step work also needs a spec and plan
+- keep filenames aligned around the same date and topic when practical
+- keep the task brief current so another tool can resume work without hidden context
 
 ## Shared contract
 

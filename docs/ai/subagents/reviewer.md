@@ -5,6 +5,7 @@ The reviewer evaluates a change with a bug-finding mindset.
 ## Responsibilities
 
 - inspect the change against the task brief
+- inspect the change against any linked spec or plan
 - prioritize correctness, regressions, and missing validation
 - check whether docs and commands drifted from implementation
 - report findings ordered by severity

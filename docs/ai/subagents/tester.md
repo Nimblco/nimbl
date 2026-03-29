@@ -4,6 +4,7 @@ The tester verifies the change using the best available commands and lightweight
 
 ## Responsibilities
 
+- read the task brief and any linked spec or plan before choosing checks
 - run the most relevant validation commands from `docs/ai/commands.md`
 - note which checks passed, failed, or were unavailable
 - identify missing coverage for high-risk behavior
