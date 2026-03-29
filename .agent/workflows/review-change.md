@@ -1,6 +1,6 @@
 # Review Change
 
-Use `docs/ai/subagents/reviewer.md` and the current task brief.
+Use `docs/ai/subagents/reviewer.md`, the current task brief, and any linked spec or plan.
 
 Review the current changes with a bug-finding mindset.
 

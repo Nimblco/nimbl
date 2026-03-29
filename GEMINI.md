@@ -11,6 +11,9 @@ Read these only when relevant:
 
 - `docs/ai/project-context.md`
 - `docs/ai/architecture.md`
+- `docs/specs/`
+- `docs/plans/`
+- `docs/ai/tasks/`
 - `docs/ai/decisions.md`
 - `docs/ai/subagents/README.md` when splitting work across roles
 

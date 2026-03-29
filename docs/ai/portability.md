@@ -7,6 +7,7 @@ This repository is designed so you can switch AI coding tools without rewriting 
 - `AGENTS.md` is the canonical shared playbook
 - `docs/ai/commands.md` is the canonical commands file
 - `docs/ai/standards.md` is the canonical engineering-rules file
+- `docs/specs/`, `docs/plans/`, and `docs/ai/tasks/` are the canonical workflow-state artifacts for in-flight work
 - `package.json` and `pnpm-workspace.yaml` are the canonical JS or TS workspace entrypoints
 
 ## Adapter strategy
@@ -20,6 +21,7 @@ This repository is designed so you can switch AI coding tools without rewriting 
 
 - do not put core repository rules only inside a vendor-specific file
 - do not rely on one tool's proprietary feature for essential project context
+- do not rely on chat history alone for active task state; commit the state to plain markdown artifacts in the repo
 - keep vendor-specific prompt files and workflows optional
 - prefer plain markdown docs over tool-only config when the guidance is meant for everyone
 

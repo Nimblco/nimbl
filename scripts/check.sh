@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+npm_cache="${repo_root}/tmp/npm-cache"
 ran_something=false
 
 run_step() {
@@ -20,8 +23,13 @@ if [[ -f package.json ]]; then
       run_step "pnpm test" pnpm test --if-present
       run_step "pnpm build" pnpm run build --if-present
       run_step "pnpm typecheck" pnpm run typecheck --if-present
+    elif command -v npm >/dev/null 2>&1; then
+      run_step "pnpm lint" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run lint --if-present
+      run_step "pnpm test" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm test --if-present
+      run_step "pnpm build" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run build --if-present
+      run_step "pnpm typecheck" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run typecheck --if-present
     else
-      echo "Warning: pnpm is not installed. Skipping pnpm workspace checks."
+      echo "Warning: neither pnpm nor npm is installed. Skipping pnpm workspace checks."
     fi
   elif command -v npm >/dev/null 2>&1; then
     run_step "Node.js checks" npm run lint --if-present

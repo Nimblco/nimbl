@@ -1,6 +1,6 @@
 # Test Change
 
-Use `docs/ai/subagents/tester.md`, `docs/ai/commands.md`, and the current task brief.
+Use `docs/ai/subagents/tester.md`, `docs/ai/commands.md`, the current task brief, and any linked spec or plan.
 
 Workflow:
 

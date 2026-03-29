@@ -6,12 +6,14 @@ Subagent roles should reference this file instead of inventing commands in promp
 
 ## Current starter commands
 
+This starter does not require Corepack. If `pnpm` is not installed globally, run `pnpm` commands through `npm exec --yes -- pnpm ...` (PowerShell: `npm.cmd exec --yes -- pnpm ...`).
+
 ### Bootstrap
 
-- PowerShell: `powershell -Command "corepack enable"`
+- PowerShell: `npm.cmd exec --yes -- pnpm install`
 - PowerShell: `pnpm install`
 - PowerShell: `./scripts/bootstrap.ps1`
-- Bash: `corepack enable`
+- Bash: `npm exec --yes -- pnpm install`
 - Bash: `pnpm install`
 - Bash: `./scripts/bootstrap.sh`
 

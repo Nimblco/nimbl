@@ -6,6 +6,23 @@
 - requested outcome:
 - primary constraint:
 
+## Linked artifacts
+
+- spec:
+- plan:
+
+## Current state
+
+- status:
+- current owner:
+- next action:
+- blockers:
+
+## Progress checklist
+
+- [ ] checkpoint 1
+- [ ] checkpoint 2
+
 ## Scope
 
 - in scope:

@@ -1,7 +1,7 @@
 {
   "name": "ai-coding-boilerplate",
   "private": true,
-  "description": "Portable AI-coding workspace scaffold powered by pnpm.",
+  "description": "Portable agentic coding workspace scaffold powered by pnpm.",
   "scripts": {
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
