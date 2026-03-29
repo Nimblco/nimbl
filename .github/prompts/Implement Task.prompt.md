@@ -1,3 +1,6 @@
+---
+description: Securely implements the assigned scope and updates relevant docs and validations
+---
 # Implement Task
 
 Use the repository playbook in [AGENTS.md](../../AGENTS.md), the current commands in [commands.md](../../docs/ai/commands.md), the current task brief, any linked spec or plan, and the implementer role in [implementer.md](../../docs/ai/subagents/implementer.md).

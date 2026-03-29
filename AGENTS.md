@@ -23,10 +23,11 @@ This file is the shared entrypoint for coding agents in this repository.
 1. Inspect the active task brief and its listed relevant files. Do not scan the entire workspace.
 2. Create or update a task brief in `docs/ai/tasks/` for every non-trivial change.
 3. Create or update a matching spec in `docs/specs/` and plan in `docs/plans/` before implementation when work changes behavior, architecture, workflow, or spans multiple steps.
-4. Make the smallest change that solves the task clearly.
-5. Update docs when behavior, architecture, or workflow changes.
-6. Run the best available validation command from `docs/ai/commands.md`.
-7. Call out assumptions, blockers, and follow-up risks explicitly.
+4. Automatically append an Architecture Decision Record (ADR) to `docs/ai/decisions.md` when introducing a new framework, dependency, or design pattern.
+5. Make the smallest change that solves the task clearly.
+6. Update docs when behavior, architecture, or workflow changes.
+7. Run the best available validation command from `docs/ai/commands.md`.
+8. Call out assumptions, blockers, and follow-up risks explicitly.
 
 ## Rules
 

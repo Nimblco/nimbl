@@ -1,3 +1,6 @@
+---
+description: Performs rigorous code review checking for bugs, regressions, and docs drift
+---
 # Review Change
 
 Use `docs/ai/subagents/reviewer.md`, the current task brief, and any linked spec or plan.

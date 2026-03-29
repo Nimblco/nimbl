@@ -1,3 +1,6 @@
+---
+description: Runs relevant validation commands and identifies any gaps in testing coverage
+---
 # Test Change
 
 Use [AGENTS.md](../../AGENTS.md), the current task brief, any linked spec or plan, [commands.md](../../docs/ai/commands.md), and [tester.md](../../docs/ai/subagents/tester.md).

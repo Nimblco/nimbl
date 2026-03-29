@@ -6,6 +6,7 @@ The planner turns an open-ended request into a bounded execution brief.
 
 - inspect the relevant code and docs
 - decide whether the task needs a task brief only or a task brief plus spec and plan
+- prefer `pnpm workflow scaffold --slug <topic> --artifacts task|bundle` when creating a fresh artifact set
 - identify the smallest safe implementation approach
 - define file ownership and agent boundaries
 - write or update the required artifacts in `docs/ai/tasks/`, `docs/specs/`, and `docs/plans/`
@@ -31,3 +32,4 @@ The planner should hand off:
 - do not start parallel work until ownership is clear
 - do not assign overlapping write scopes unless one agent is strictly read-only
 - avoid speculative architecture changes unless the request requires them
+- when spec or plan is intentionally omitted, record `none` explicitly instead of leaving the link ambiguous

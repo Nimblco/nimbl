@@ -1,3 +1,6 @@
+---
+description: Runs relevant validation commands and identifies any gaps in testing coverage
+---
 # Test Change
 
 Use `docs/ai/subagents/tester.md`, `docs/ai/commands.md`, the current task brief, and any linked spec or plan.

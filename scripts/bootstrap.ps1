@@ -1,4 +1,4 @@
-Write-Host "AI Coding Boilerplate bootstrap"
+Write-Host "Nimblco bootstrap"
 Write-Host ""
 Write-Host "Next recommended steps:"
 Write-Host "1. Add your application code under apps/ or packages/."

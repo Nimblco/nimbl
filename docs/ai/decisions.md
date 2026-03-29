@@ -29,6 +29,22 @@ When this repo itself changes as a reusable starter, record those decisions here
 - decision:
 - consequences:
 
+### Workflow handoffs export as markdown packs
+
+- date: 2026-03-29
+- status: accepted
+- context: prompt-only handoffs were useful for direct tool switching, but they did not give another IDE or LLM a single portable artifact with current task state, linked docs, and repo change context
+- decision: add a `workflow pack` command that writes a markdown handoff file by default, includes changed-file context out of the box, and only includes raw git diff content when explicitly requested
+- consequences: cross-tool transfers can use one markdown file instead of a raw chat transcript; the default output stays compact for token-limited tools; the pack format now becomes part of the workflow surface that docs and starter scripts must keep current
+
+### Workflow CLI stays non-interactive-first
+
+- date: 2026-03-29
+- status: accepted
+- context: the repo's workflow model depends on consistent task/spec/plan bundles, but agents were still creating those artifacts manually and relying on memory for required fields
+- decision: add a `workflow scaffold` command and keep the workflow CLI non-interactive-first so agents and scripts can create aligned artifacts deterministically; use explicit `none` values for intentionally omitted spec or plan links
+- consequences: `workflow check` can validate clearer task-brief shapes; docs can point to one default entrypoint; interactive helpers remain possible later without becoming the primary interface
+
 ## Notes
 
 - Prefer a new entry when a decision would otherwise be easy to forget or reverse incorrectly.

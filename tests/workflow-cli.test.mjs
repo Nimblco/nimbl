@@ -17,6 +17,9 @@ function createFixtureRepo({ tasks, spec = true, plan = true }) {
   writeRepoFile(repoRoot, "AGENTS.md", "# agents\n");
   writeRepoFile(repoRoot, "docs/ai/commands.md", "# commands\n");
   writeRepoFile(repoRoot, "docs/ai/standards.md", "# standards\n");
+  writeRepoFile(repoRoot, "docs/ai/tasks/TEMPLATE.md", "# task template\n");
+  writeRepoFile(repoRoot, "docs/specs/TEMPLATE.md", "# spec template\n");
+  writeRepoFile(repoRoot, "docs/plans/TEMPLATE.md", "# plan template\n");
 
   if (spec) {
     writeRepoFile(repoRoot, "docs/specs/2026-03-29-example.md", "# spec\n");
@@ -57,6 +60,7 @@ function makeTaskBrief({
   blockers = "none",
   spec = "`docs/specs/2026-03-29-example.md`",
   plan = "`docs/plans/2026-03-29-example.md`",
+  relevantFiles = [],
 } = {}) {
   return `# Task Brief
 
@@ -78,11 +82,29 @@ function makeTaskBrief({
 - next action: ${nextAction}
 - blockers: ${blockers}
 
-## Validation
+${relevantFiles.length > 0 ? `## Relevant files
+
+${relevantFiles.map((file) => `- ${file}`).join("\n")}
+
+` : ""}## Validation
 
 - node --test
 - powershell -ExecutionPolicy Bypass -File .\\scripts\\check.ps1
 `;
+}
+
+function createGitRunner({ status = "", diff = "" } = {}) {
+  return (command) => {
+    if (command === "git status --short") {
+      return status;
+    }
+
+    if (command === "git diff --no-ext-diff") {
+      return diff;
+    }
+
+    throw new Error(`Unexpected command: ${command}`);
+  };
 }
 
 async function loadWorkflowModule() {
@@ -158,6 +180,240 @@ test("check allows a task brief with a linked spec and no plan", async () => {
 
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, /Workflow check passed/);
+});
+
+test("check fails when the task brief is missing status and next action", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": `# Task Brief
+
+## Linked artifacts
+
+- spec: none
+- plan: none
+
+## Current state
+
+- current owner: codex
+- blockers: none
+`,
+    },
+    spec: false,
+    plan: false,
+  });
+
+  const result = runCli(["check"], { repoRoot });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr, /Missing required field: status/);
+  assert.match(result.stderr, /Missing required field: next action/);
+});
+
+test("check fails when a task brief links a plan without a spec", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": makeTaskBrief({
+        spec: "none",
+        plan: "`docs/plans/2026-03-29-example.md`",
+      }),
+    },
+    spec: false,
+  });
+
+  const result = runCli(["check"], { repoRoot });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr, /A linked plan requires a linked spec/);
+});
+
+test("check accepts relevant file entries that include descriptions", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": `# Task Brief
+
+## Linked artifacts
+
+- spec: none
+- plan: none
+
+## Current state
+
+- status: in_progress
+- current owner: codex
+- next action: verify the workflow parser
+- blockers: none
+
+## Relevant files
+
+- scripts/workflow-lib.mjs: existing workflow CLI implementation
+- docs/ai/commands.md: command source of truth
+`,
+    },
+    spec: false,
+    plan: false,
+  });
+  writeRepoFile(repoRoot, "scripts/workflow-lib.mjs", "// workflow cli\n");
+
+  const result = runCli(["check"], { repoRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /Workflow check passed/);
+});
+
+test("scaffold creates aligned task, spec, and plan files for a bundle", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {},
+    spec: false,
+    plan: false,
+  });
+
+  const result = runCli(
+    ["scaffold", "--slug", "workflow-automation", "--artifacts", "bundle"],
+    { repoRoot, now: new Date("2026-03-29T08:00:00Z") },
+  );
+
+  const taskPath = path.join(repoRoot, "docs", "ai", "tasks", "2026-03-29-workflow-automation.md");
+  const specPath = path.join(repoRoot, "docs", "specs", "2026-03-29-workflow-automation.md");
+  const planPath = path.join(repoRoot, "docs", "plans", "2026-03-29-workflow-automation.md");
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /Scaffolded workflow artifacts:/);
+  assert.equal(existsSync(taskPath), true);
+  assert.equal(existsSync(specPath), true);
+  assert.equal(existsSync(planPath), true);
+  assert.match(readFileSync(taskPath, "utf8"), /spec: `docs\/specs\/2026-03-29-workflow-automation\.md`/);
+  assert.match(readFileSync(taskPath, "utf8"), /plan: `docs\/plans\/2026-03-29-workflow-automation\.md`/);
+});
+
+test("scaffold can create a task-only artifact set with explicit none links", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {},
+    spec: false,
+    plan: false,
+  });
+
+  const result = runCli(
+    ["scaffold", "--slug", "docs-tweak", "--artifacts", "task"],
+    { repoRoot, now: new Date("2026-03-29T08:00:00Z") },
+  );
+
+  const taskPath = path.join(repoRoot, "docs", "ai", "tasks", "2026-03-29-docs-tweak.md");
+  const specPath = path.join(repoRoot, "docs", "specs", "2026-03-29-docs-tweak.md");
+  const planPath = path.join(repoRoot, "docs", "plans", "2026-03-29-docs-tweak.md");
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(existsSync(taskPath), true);
+  assert.equal(existsSync(specPath), false);
+  assert.equal(existsSync(planPath), false);
+  assert.match(readFileSync(taskPath, "utf8"), /spec: none/);
+  assert.match(readFileSync(taskPath, "utf8"), /plan: none/);
+});
+
+test("pack writes a default handoff markdown file with changed files and prompt text", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": makeTaskBrief({
+        relevantFiles: ["scripts/workflow-lib.mjs: existing workflow CLI implementation"],
+      }),
+    },
+  });
+
+  const result = runCli(["pack"], {
+    repoRoot,
+    now: new Date("2026-03-29T09:00:00Z"),
+    commandRunner: createGitRunner({
+      status: " M scripts/workflow-lib.mjs\n?? docs/ai/tasks/2026-03-29-example.md\n",
+    }),
+  });
+
+  const packPath = path.join(repoRoot, "docs", "ai", "handoffs", "2026-03-29-example-handoff.md");
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /Wrote workflow handoff pack:/);
+  assert.equal(existsSync(packPath), true);
+  assert.match(readFileSync(packPath, "utf8"), /# Workflow Handoff Pack/);
+  assert.match(readFileSync(packPath, "utf8"), /docs\/ai\/tasks\/2026-03-29-example\.md/);
+  assert.match(readFileSync(packPath, "utf8"), /scripts\/workflow-lib\.mjs/);
+  assert.match(readFileSync(packPath, "utf8"), /Read AGENTS\.md/);
+});
+
+test("pack --stdout prints the full pack text without writing the default file", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": makeTaskBrief(),
+    },
+  });
+
+  const result = runCli(["pack", "--stdout"], {
+    repoRoot,
+    commandRunner: createGitRunner({
+      status: " M scripts/workflow-lib.mjs\n",
+    }),
+  });
+
+  const packPath = path.join(repoRoot, "docs", "ai", "handoffs", "2026-03-29-example-handoff.md");
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /# Workflow Handoff Pack/);
+  assert.equal(existsSync(packPath), false);
+});
+
+test("pack --copy writes a custom output file and copies the pack text", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": makeTaskBrief(),
+    },
+  });
+  const customPackPath = path.join(repoRoot, "tmp", "example-pack.md");
+  let copiedText = null;
+
+  const result = runCli(["pack", "--copy", "--output", "tmp/example-pack.md"], {
+    repoRoot,
+    clipboardWriter: (text) => {
+      copiedText = text;
+      return true;
+    },
+    commandRunner: createGitRunner({
+      status: "",
+    }),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /Clipboard: copied pack text/);
+  assert.equal(existsSync(customPackPath), true);
+  assert.match(copiedText, /# Workflow Handoff Pack/);
+  assert.equal(copiedText, readFileSync(customPackPath, "utf8"));
+});
+
+test("pack --include-diff appends a git diff section and honors target prompts", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": makeTaskBrief(),
+    },
+  });
+
+  const result = runCli(["pack", "--stdout", "--include-diff", "--to", "gemini"], {
+    repoRoot,
+    commandRunner: createGitRunner({
+      status: " M scripts/workflow-lib.mjs\n",
+      diff: "diff --git a/scripts/workflow-lib.mjs b/scripts/workflow-lib.mjs\n+new line\n",
+    }),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /## Prompt/);
+  assert.match(result.stdout, /Read GEMINI\.md/);
+  assert.match(result.stdout, /## Git Diff/);
+  assert.match(result.stdout, /diff --git a\/scripts\/workflow-lib\.mjs/);
 });
 
 test("finalize archives a completed task brief, spec, and plan bundle", async () => {
@@ -415,5 +671,5 @@ test("status --copy fails clearly because --copy is unsupported", async () => {
   const result = runCli(["status", "--copy"], {});
   
   assert.equal(result.exitCode, 1);
-  assert.match(result.stderr, /--copy is only supported by handoff and resume commands/);
+  assert.match(result.stderr, /--copy is only supported by handoff, resume, and pack commands/);
 });

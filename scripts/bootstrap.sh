@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-echo "AI Coding Boilerplate bootstrap"
+echo "Nimblco bootstrap"
 echo
 echo "Next recommended steps:"
 echo "1. Add your application code under apps/ or packages/."

@@ -1,0 +1,10 @@
+.git/
+node_modules/
+tmp/
+_external/
+tests/
+*.test.mjs
+.gitignore
+.github/workflows/
+pnpm-lock.yaml
+pnpm-workspace.yaml

@@ -6,7 +6,7 @@ Subagent roles should reference this file instead of inventing commands in promp
 
 ## Current starter commands
 
-This starter does not require Corepack. If `pnpm` is not installed globally, run `pnpm` commands through `npm exec --yes -- pnpm ...` (PowerShell: `npm.cmd exec --yes -- pnpm ...`).
+These commands are for contributors working on the Nimblco package itself. If you have installed Nimblco into another repo, refer to that repo's `docs/ai/commands.md` for its project-specific commands.
 
 ### Bootstrap
 
@@ -29,22 +29,35 @@ This starter does not require Corepack. If `pnpm` is not installed globally, run
 
 ### Workflow switching
 
-- `pnpm workflow finalize` archives a completed workflow bundle: task brief plus linked spec and plan when present
+- `pnpm workflow scaffold --slug <topic> --artifacts bundle` creates a dated task brief plus matching spec and plan
+- `pnpm workflow scaffold --slug <topic> --artifacts task` creates a dated task brief only and records `spec: none` plus `plan: none`
+- `pnpm workflow check` validates required task-brief fields and linked workflow artifacts
+- `pnpm workflow pack` writes a portable markdown handoff pack under `docs/ai/handoffs/`
+- `pnpm workflow pack --to gemini` writes a pack with a gemini-ready prompt block
+- `pnpm workflow pack --stdout` prints the pack instead of writing a file
+- `pnpm workflow pack --include-diff` appends git diff details when deeper handoff context is needed
+- `pnpm workflow finalize` validates the active task brief, then archives the completed bundle (task + linked spec + plan) to `archive/` subdirectories
+- `pnpm workflow archive --task <path-to-completed-task-brief>` archives a completed bundle without running validation (use when the brief is already known-good)
 - `pnpm workflow handoff --to gemini`
 - `pnpm workflow handoff --to claude`
 - `pnpm workflow resume`
 - `pnpm workflow status`
-- `pnpm workflow check`
-- `pnpm workflow finalize`
-- `pnpm workflow archive --task <path-to-completed-task-brief>`
+- PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- scaffold --slug <topic> --artifacts bundle`
+- PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- scaffold --slug <topic> --artifacts task`
+- PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- pack --to gemini`
 - PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- handoff --to gemini`
 - PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- status`
+- PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- check`
 - PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- finalize --task <path-to-completed-task-brief>`
+- Bash fallback without global `pnpm`: `npm run workflow -- scaffold --slug <topic> --artifacts bundle`
+- Bash fallback without global `pnpm`: `npm run workflow -- scaffold --slug <topic> --artifacts task`
+- Bash fallback without global `pnpm`: `npm run workflow -- pack --to gemini`
+- Bash fallback without global `pnpm`: `npm run workflow -- check`
 - Bash fallback without global `pnpm`: `npm run workflow -- handoff --to gemini`
 
 ## How to evolve this file
 
-Once the real app stack exists, replace this section with the actual commands for:
+When working in a repo where Nimblco has been installed, replace the bootstrap and validation sections above with the actual commands for that project:
 
 - install
 - dev

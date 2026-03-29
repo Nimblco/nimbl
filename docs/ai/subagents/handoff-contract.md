@@ -34,5 +34,5 @@ output format: short summary, changed files, test result, remaining risks
 
 - write scope should be explicit and as small as possible
 - if multiple subagents are active, their write scopes should not overlap
-- include artifact paths even when one of them is intentionally omitted
+- include artifact paths even when one of them is intentionally omitted, using explicit `none` when needed
 - if you cannot honor the scope, stop and escalate instead of expanding it silently

@@ -3,12 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 const TASKS_DIRECTORY = path.join("docs", "ai", "tasks");
+const HANDOFFS_DIRECTORY = path.join("docs", "ai", "handoffs");
 const TASKS_ARCHIVE_DIRECTORY = path.join(TASKS_DIRECTORY, "archive");
 const SPECS_DIRECTORY = path.join("docs", "specs");
 const SPECS_ARCHIVE_DIRECTORY = path.join(SPECS_DIRECTORY, "archive");
 const PLANS_DIRECTORY = path.join("docs", "plans");
 const PLANS_ARCHIVE_DIRECTORY = path.join(PLANS_DIRECTORY, "archive");
 const IGNORED_TASK_FILES = new Set(["README.md", "TEMPLATE.md"]);
+const SCAFFOLD_ARTIFACT_MODES = new Set(["task", "bundle"]);
 const TARGET_ADAPTERS = {
   codex: null,
   claude: "CLAUDE.md",
@@ -45,6 +47,60 @@ function formatPromptFiles(items) {
   return items.join(", ");
 }
 
+function formatDateStamp(now) {
+  return now.toISOString().slice(0, 10);
+}
+
+function formatScaffoldTitle(slug) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function normalizeSlug(value) {
+  if (!value) {
+    return null;
+  }
+
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+
+  return slug || null;
+}
+
+function normalizeCommandOutput(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return value.toString("utf8");
+  }
+
+  return value == null ? "" : String(value);
+}
+
+function cleanRelevantFileEntry(value) {
+  const withoutBackticks = value.replace(/`/gu, "").trim();
+
+  if (!withoutBackticks || withoutBackticks.startsWith("file or directory")) {
+    return null;
+  }
+
+  const separatorIndex = withoutBackticks.search(/:(?=\s)/u);
+
+  if (separatorIndex === -1) {
+    return withoutBackticks;
+  }
+
+  return withoutBackticks.slice(0, separatorIndex).trim();
+}
+
 function readTaskBrief(taskPath, repoRoot) {
   const content = fs.readFileSync(taskPath, "utf8");
   const lines = content.split(/\r?\n/u);
@@ -77,9 +133,9 @@ function readTaskBrief(taskPath, repoRoot) {
       const fileMatch = line.match(/^- (.+)$/u);
 
       if (fileMatch) {
-        let fp = fileMatch[1].trim();
-        fp = fp.replace(/`/g, '');
-        if (!fp.startsWith("file or directory")) {
+        const fp = cleanRelevantFileEntry(fileMatch[1]);
+
+        if (fp) {
           relevantFiles.push(fp);
         }
       }
@@ -256,6 +312,10 @@ function validateTaskBrief(taskBrief, repoRoot) {
     issues.push("Missing required field: next action");
   }
 
+  if (taskBrief.plan && !taskBrief.spec) {
+    issues.push("A linked plan requires a linked spec.");
+  }
+
   if (taskBrief.spec && !fs.existsSync(resolveLinkedPath(repoRoot, taskBrief.spec))) {
     issues.push(`Linked spec does not exist: ${taskBrief.spec}`);
   }
@@ -277,6 +337,398 @@ function validateTaskBrief(taskBrief, repoRoot) {
 
 function renderValidationFailure(issues) {
   return ["Workflow check failed:", ...issues.map((issue) => `- ${issue}`)].join("\n");
+}
+
+function parseGitStatusLines(output) {
+  return normalizeCommandOutput(output)
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function readGitStatus(repoRoot, commandRunner) {
+  try {
+    return {
+      lines: parseGitStatusLines(commandRunner("git status --short", { cwd: repoRoot })),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      lines: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function readGitDiff(repoRoot, commandRunner) {
+  try {
+    const diffText = normalizeCommandOutput(
+      commandRunner("git diff --no-ext-diff", { cwd: repoRoot }),
+    ).trim();
+    return {
+      text: diffText,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      text: "",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function renderListSection(title, items, emptyMessage) {
+  const lines = [`## ${title}`, ""];
+
+  if (items.length === 0) {
+    lines.push(`- ${emptyMessage}`);
+  } else {
+    for (const item of items) {
+      lines.push(`- ${item}`);
+    }
+  }
+
+  lines.push("");
+  return lines;
+}
+
+function buildPackContent(
+  taskBrief,
+  { repoRoot, target, commandRunner, includeDiff = false, generatedAt = new Date() },
+) {
+  const gitStatus = readGitStatus(repoRoot, commandRunner);
+  const gitDiff = includeDiff ? readGitDiff(repoRoot, commandRunner) : { text: "", error: null };
+  const changedFiles = gitStatus.error
+    ? [`unavailable: ${gitStatus.error}`]
+    : gitStatus.lines.length > 0
+      ? gitStatus.lines
+      : ["none detected"];
+  const promptText = buildPrompt(taskBrief, target ?? null);
+  const lines = [
+    "# Workflow Handoff Pack",
+    "",
+    `Generated: ${generatedAt.toISOString()}`,
+    `Target tool: ${target ?? "generic"}`,
+    "",
+    "## Task State",
+    "",
+    `- Task brief: ${taskBrief.relativePath}`,
+    `- Spec: ${taskBrief.spec ?? "none"}`,
+    `- Plan: ${taskBrief.plan ?? "none"}`,
+    `- Status: ${taskBrief.status ?? "missing"}`,
+    `- Next action: ${taskBrief.nextAction ?? "missing"}`,
+    `- Blockers: ${taskBrief.blockers ?? "none"}`,
+    "",
+    ...renderListSection("Relevant Files", taskBrief.relevantFiles, "none listed"),
+    ...renderListSection("Validation", taskBrief.validationCommands, "none listed"),
+    ...renderListSection("Changed Files", changedFiles, "none detected"),
+    "## Prompt",
+    "",
+    "```text",
+    promptText,
+    "```",
+    "",
+  ];
+
+  if (includeDiff) {
+    lines.push("## Git Diff", "");
+    if (gitDiff.error) {
+      lines.push(`Git diff unavailable: ${gitDiff.error}`, "");
+    } else if (!gitDiff.text) {
+      lines.push("No diff output.", "");
+    } else {
+      lines.push("```diff", gitDiff.text, "```", "");
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function resolvePackOutputPath(repoRoot, taskBrief, outputPath) {
+  if (outputPath) {
+    return path.isAbsolute(outputPath) ? outputPath : path.join(repoRoot, outputPath);
+  }
+
+  const filename = `${path.basename(taskBrief.absolutePath, ".md")}-handoff.md`;
+  return path.join(repoRoot, HANDOFFS_DIRECTORY, filename);
+}
+
+function renderPackSummary(packRelativePath, copied, target) {
+  const lines = [
+    `Target tool: ${target ?? "generic"}`,
+    `Wrote workflow handoff pack: ${packRelativePath}`,
+  ];
+
+  if (copied) {
+    lines.push("Clipboard: copied pack text");
+  }
+
+  return lines.join("\n");
+}
+
+function buildScaffoldPaths(repoRoot, slug, artifacts, now) {
+  const dateStamp = formatDateStamp(now);
+  const basename = `${dateStamp}-${slug}.md`;
+  const taskRelativePath = toRepoPath(path.join(TASKS_DIRECTORY, basename));
+  const specRelativePath = artifacts === "bundle" ? toRepoPath(path.join(SPECS_DIRECTORY, basename)) : null;
+  const planRelativePath = artifacts === "bundle" ? toRepoPath(path.join(PLANS_DIRECTORY, basename)) : null;
+
+  return {
+    basename,
+    title: formatScaffoldTitle(slug),
+    task: {
+      relativePath: taskRelativePath,
+      absolutePath: path.join(repoRoot, TASKS_DIRECTORY, basename),
+    },
+    spec: specRelativePath
+      ? {
+          relativePath: specRelativePath,
+          absolutePath: path.join(repoRoot, SPECS_DIRECTORY, basename),
+        }
+      : null,
+    plan: planRelativePath
+      ? {
+          relativePath: planRelativePath,
+          absolutePath: path.join(repoRoot, PLANS_DIRECTORY, basename),
+        }
+      : null,
+  };
+}
+
+function renderTaskBriefTemplate({ title, taskPath, specPath, planPath }) {
+  return `# Task Brief
+
+## Summary
+
+- task: ${title.toLowerCase()}
+- requested outcome:
+- primary constraint:
+
+## Linked artifacts
+
+- spec: ${specPath ? `\`${specPath}\`` : "none"}
+- plan: ${planPath ? `\`${planPath}\`` : "none"}
+
+## Current state
+
+- status: todo
+- current owner: unassigned
+- next action: fill in the task summary, scope, and validation details
+- blockers: none
+
+## Progress checklist
+
+- [ ] checkpoint 1
+- [ ] checkpoint 2
+
+## Scope
+
+- in scope:
+- out of scope:
+
+## File ownership
+
+- planner:
+- implementer:
+- reviewer:
+- tester:
+
+## Relevant files
+
+- file or directory 1:
+- file or directory 2:
+
+## Acceptance criteria
+
+- criterion 1:
+- criterion 2:
+
+## Validation
+
+- command 1:
+- command 2:
+
+## Risks or dependencies
+
+- risk 1:
+- dependency 1:
+
+## Handoff notes
+
+- notes for the next agent:
+`;
+}
+
+function renderSpecTemplate({ title, taskPath, planPath }) {
+  return `# Spec: ${title.toLowerCase()}
+
+## Purpose
+
+Describe the approved change in one or two sentences.
+
+## Scope
+
+- in scope:
+- out of scope:
+
+## Proposed behavior
+
+Describe the behavior, workflow, or architecture change at a level that another agent can implement without guessing.
+
+## Acceptance criteria
+
+- [ ] criterion 1
+- [ ] criterion 2
+
+## Constraints
+
+- technical:
+- product:
+- delivery:
+
+## Risks and open questions
+
+- risk 1:
+- question 1:
+
+## Related docs
+
+- plan: ${planPath ? `[${path.basename(planPath)}](../plans/${path.basename(planPath)})` : "none"}
+- task brief: [${path.basename(taskPath)}](../ai/tasks/${path.basename(taskPath)})
+- product doc: none
+`;
+}
+
+function renderPlanTemplate({ title, taskPath, specPath }) {
+  return `# ${title} Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
+
+**Goal:** Summarize the outcome this plan should produce.
+
+**Architecture:** Describe the implementation approach in a few sentences.
+
+**Tech Stack:** List the key technologies and commands involved.
+
+---
+
+## References
+
+- spec: ${specPath ? `[${path.basename(specPath)}](../specs/${path.basename(specPath)})` : "none"}
+- task brief: [${path.basename(taskPath)}](../ai/tasks/${path.basename(taskPath)})
+- product doc: none
+
+## Steps
+
+- [ ] Step 1
+- [ ] Step 2
+- [ ] Step 3
+
+## Validation
+
+- [ ] Run the relevant targeted checks.
+- [ ] Run the repo's documented validation command(s) from \`docs/ai/commands.md\`.
+
+## Risks
+
+- risk 1:
+- risk 2:
+
+## Handoff notes
+
+- anything the next agent needs to know:
+`;
+}
+
+function writeScaffoldFile(entry, content, createdEntries, repoRoot) {
+  if (fs.existsSync(entry.absolutePath)) {
+    throw new WorkflowError(`Scaffold destination already exists: ${entry.relativePath}`);
+  }
+
+  fs.mkdirSync(path.dirname(entry.absolutePath), { recursive: true });
+  fs.writeFileSync(entry.absolutePath, content);
+  createdEntries.push({
+    absolutePath: entry.absolutePath,
+    relativePath: entry.relativePath,
+  });
+}
+
+function scaffoldWorkflowArtifacts(repoRoot, { slug, artifacts, now }) {
+  const normalizedSlug = normalizeSlug(slug);
+
+  if (!normalizedSlug) {
+    throw new WorkflowError("Missing or invalid value for --slug.");
+  }
+
+  if (!SCAFFOLD_ARTIFACT_MODES.has(artifacts)) {
+    throw new WorkflowError(
+      `Unknown value for --artifacts: ${artifacts}. Expected one of: ${[...SCAFFOLD_ARTIFACT_MODES].join(", ")}`,
+    );
+  }
+
+  const paths = buildScaffoldPaths(repoRoot, normalizedSlug, artifacts, now);
+  const createdEntries = [];
+
+  try {
+    if (paths.spec) {
+      writeScaffoldFile(
+        paths.spec,
+        renderSpecTemplate({
+          title: paths.title,
+          taskPath: paths.task.relativePath,
+          planPath: paths.plan?.relativePath ?? null,
+        }),
+        createdEntries,
+        repoRoot,
+      );
+    }
+
+    if (paths.plan) {
+      writeScaffoldFile(
+        paths.plan,
+        renderPlanTemplate({
+          title: paths.title,
+          taskPath: paths.task.relativePath,
+          specPath: paths.spec?.relativePath ?? null,
+        }),
+        createdEntries,
+        repoRoot,
+      );
+    }
+
+    writeScaffoldFile(
+      paths.task,
+      renderTaskBriefTemplate({
+        title: paths.title,
+        taskPath: paths.task.relativePath,
+        specPath: paths.spec?.relativePath ?? null,
+        planPath: paths.plan?.relativePath ?? null,
+      }),
+      createdEntries,
+      repoRoot,
+    );
+  } catch (error) {
+    for (const entry of createdEntries.slice().reverse()) {
+      if (fs.existsSync(entry.absolutePath)) {
+        fs.unlinkSync(entry.absolutePath);
+      }
+    }
+
+    throw error;
+  }
+
+  return [
+    { label: "Task", path: paths.task.relativePath },
+    ...(paths.spec ? [{ label: "Spec", path: paths.spec.relativePath }] : []),
+    ...(paths.plan ? [{ label: "Plan", path: paths.plan.relativePath }] : []),
+  ];
+}
+
+function renderScaffoldSummary(entries) {
+  return [
+    "Scaffolded workflow artifacts:",
+    ...entries.map((entry) => `- ${entry.label}: ${entry.path}`),
+  ].join("\n");
 }
 
 function resolveTaskBundle(taskBrief, repoRoot) {
@@ -418,6 +870,8 @@ function renderHelp() {
     "Usage: workflow <command> [options]",
     "",
     "Commands:",
+    "  scaffold          Create aligned workflow artifacts for a new task",
+    "  pack              Create a portable markdown handoff pack",
     "  handoff           Print a copy-pasteable prompt for the next tool",
     "  resume            Print a generic resume prompt from the selected task brief",
     "  status            Show the selected task brief summary",
@@ -428,6 +882,12 @@ function renderHelp() {
     "Options:",
     "  --task <path>     Use an explicit task brief path or filename",
     "  --to <tool>       Target tool for handoff: codex, claude, gemini, copilot",
+    "  --slug <topic>    Topic slug for scaffold, for example workflow-automation",
+    "  --artifacts <m>   Artifact set for scaffold: task or bundle",
+    "  --output <path>   Output path override for workflow pack",
+    "  --stdout          Print the workflow pack instead of writing a file",
+    "  --include-diff    Include git diff details in the workflow pack",
+    "  --copy            Copy output to clipboard (handoff, resume, pack)",
     "  --help            Show this help text",
   ].join("\n");
 }
@@ -436,6 +896,11 @@ function parseArguments(argv) {
   let command = null;
   let task = null;
   let target = null;
+  let slug = null;
+  let artifacts = "bundle";
+  let output = null;
+  let stdoutMode = false;
+  let includeDiff = false;
   let help = false;
   let copy = false;
 
@@ -449,6 +914,16 @@ function parseArguments(argv) {
 
     if (argument === "--copy") {
       copy = true;
+      continue;
+    }
+
+    if (argument === "--stdout") {
+      stdoutMode = true;
+      continue;
+    }
+
+    if (argument === "--include-diff") {
+      includeDiff = true;
       continue;
     }
 
@@ -474,6 +949,39 @@ function parseArguments(argv) {
       continue;
     }
 
+    if (argument === "--slug") {
+      slug = argv[index + 1];
+      index += 1;
+
+      if (!slug) {
+        throw new WorkflowError("Missing value for --slug.");
+      }
+
+      continue;
+    }
+
+    if (argument === "--artifacts") {
+      artifacts = argv[index + 1];
+      index += 1;
+
+      if (!artifacts) {
+        throw new WorkflowError("Missing value for --artifacts.");
+      }
+
+      continue;
+    }
+
+    if (argument === "--output") {
+      output = argv[index + 1];
+      index += 1;
+
+      if (!output) {
+        throw new WorkflowError("Missing value for --output.");
+      }
+
+      continue;
+    }
+
     if (argument.startsWith("--")) {
       throw new WorkflowError(`Unknown option: ${argument}`);
     }
@@ -485,7 +993,7 @@ function parseArguments(argv) {
     command = argument;
   }
 
-  return { command, task, target, help, copy };
+  return { command, task, target, slug, artifacts, output, stdoutMode, includeDiff, help, copy };
 }
 
 function defaultClipboardWriter(text) {
@@ -503,13 +1011,19 @@ function defaultClipboardWriter(text) {
       try {
         execSync("wl-copy", { input: text });
         return true;
-      } catch {
+      } catch (wlError) {
         try {
           execSync("xclip -selection clipboard", { input: text });
           return true;
-        } catch {
-          execSync("xsel --clipboard --input", { input: text });
-          return true;
+        } catch (xclipError) {
+          try {
+            execSync("xsel --clipboard --input", { input: text });
+            return true;
+          } catch (xselError) {
+            throw new WorkflowError(
+              `Clipboard command failed (tried wl-copy, xclip, xsel): ${xselError.message}`,
+            );
+          }
         }
       }
     }
@@ -519,20 +1033,59 @@ function defaultClipboardWriter(text) {
   throw new WorkflowError(`Clipboard support is not available for platform: ${platform}`);
 }
 
-export function runCli(argv, { repoRoot = process.cwd(), clipboardWriter = defaultClipboardWriter } = {}) {
-  try {
-    const { command, task, target, help, copy } = parseArguments(argv);
+function defaultCommandRunner(command, options = {}) {
+  return execSync(command, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    ...options,
+  });
+}
 
-    if (copy && command !== "handoff" && command !== "resume") {
-      throw new WorkflowError("--copy is only supported by handoff and resume commands.");
+export function runCli(
+  argv,
+  {
+    repoRoot = process.cwd(),
+    clipboardWriter = defaultClipboardWriter,
+    commandRunner = defaultCommandRunner,
+    now = new Date(),
+  } = {},
+) {
+  try {
+    const {
+      command,
+      task,
+      target,
+      slug,
+      artifacts,
+      output,
+      stdoutMode,
+      includeDiff,
+      help,
+      copy,
+    } = parseArguments(argv);
+
+    if (copy && command !== "handoff" && command !== "resume" && command !== "pack") {
+      throw new WorkflowError("--copy is only supported by handoff, resume, and pack commands.");
     }
 
     if (help || !command) {
       return { exitCode: 0, stdout: renderHelp(), stderr: "" };
     }
 
-    if (target && command !== "handoff") {
-      throw new WorkflowError("--to is only supported by the handoff command.");
+    if (target && command !== "handoff" && command !== "pack") {
+      throw new WorkflowError("--to is only supported by the handoff and pack commands.");
+    }
+
+    if (output && command !== "pack") {
+      throw new WorkflowError("--output is only supported by the pack command.");
+    }
+
+    if (stdoutMode && command !== "pack") {
+      throw new WorkflowError("--stdout is only supported by the pack command.");
+    }
+
+    if (includeDiff && command !== "pack") {
+      throw new WorkflowError("--include-diff is only supported by the pack command.");
     }
 
     if (target && !(target in TARGET_ADAPTERS)) {
@@ -541,7 +1094,61 @@ export function runCli(argv, { repoRoot = process.cwd(), clipboardWriter = defau
       );
     }
 
+    if (command === "scaffold") {
+      if (task) {
+        throw new WorkflowError("--task is not supported by the scaffold command.");
+      }
+
+      const createdEntries = scaffoldWorkflowArtifacts(repoRoot, {
+        slug,
+        artifacts,
+        now,
+      });
+
+      return {
+        exitCode: 0,
+        stdout: renderScaffoldSummary(createdEntries),
+        stderr: "",
+      };
+    }
+
     const taskBrief = resolveTaskBrief(repoRoot, task);
+
+    if (command === "pack") {
+      if (stdoutMode && output) {
+        throw new WorkflowError("--stdout cannot be combined with --output.");
+      }
+
+      const packText = buildPackContent(taskBrief, {
+        repoRoot,
+        target: target ?? null,
+        commandRunner,
+        includeDiff,
+        generatedAt: now,
+      });
+
+      if (copy) {
+        clipboardWriter(packText);
+      }
+
+      if (stdoutMode) {
+        return {
+          exitCode: 0,
+          stdout: packText,
+          stderr: "",
+        };
+      }
+
+      const outputPath = resolvePackOutputPath(repoRoot, taskBrief, output);
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, packText);
+
+      return {
+        exitCode: 0,
+        stdout: renderPackSummary(toRepoPath(path.relative(repoRoot, outputPath)), copy, target ?? null),
+        stderr: "",
+      };
+    }
 
     if (command === "handoff") {
       const promptText = buildPrompt(taskBrief, target ?? null);
