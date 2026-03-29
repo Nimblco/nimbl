@@ -8,3 +8,6 @@ tests/
 .github/workflows/
 pnpm-lock.yaml
 pnpm-workspace.yaml
+docs/ai/tasks/archive/
+docs/plans/archive/
+docs/specs/archive/

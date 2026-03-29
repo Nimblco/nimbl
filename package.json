@@ -21,6 +21,7 @@
   "files": [
     "scripts/",
     "docs/",
+    "!docs/**/archive/",
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
