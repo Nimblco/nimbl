@@ -33,19 +33,19 @@ $ranSomething = $false
 if (Invoke-IfExists -Path "package.json" -Label "Node.js checks" -Action {
   if (Test-Path -LiteralPath "pnpm-workspace.yaml") {
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-      pnpm run lint --if-present
-      pnpm test --if-present
-      pnpm run build --if-present
-      pnpm run typecheck --if-present
+      pnpm run lint
+      pnpm run test
+      pnpm run build
+      pnpm run typecheck
     } elseif (Get-Command npm.cmd -ErrorAction SilentlyContinue) {
       $originalNpmCache = $env:npm_config_cache
       $env:npm_config_cache = $npmCache
 
       try {
-        & npm.cmd exec --yes -- pnpm run lint --if-present
-        & npm.cmd exec --yes -- pnpm test --if-present
-        & npm.cmd exec --yes -- pnpm run build --if-present
-        & npm.cmd exec --yes -- pnpm run typecheck --if-present
+        & npm.cmd exec --yes -- pnpm run lint
+        & npm.cmd exec --yes -- pnpm run test
+        & npm.cmd exec --yes -- pnpm run build
+        & npm.cmd exec --yes -- pnpm run typecheck
       } finally {
         if ($null -ne $originalNpmCache -and $originalNpmCache -ne "") {
           $env:npm_config_cache = $originalNpmCache

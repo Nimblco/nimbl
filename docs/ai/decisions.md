@@ -1,22 +1,23 @@
 # Engineering Decisions
 
-Track meaningful technical decisions here.
+Use this file for durable decisions that affect how the product or repository should evolve.
 
-### Committed workflow artifacts for tool switching
+Keep entries short, specific, and ordered with the newest decision at the top. This file is intentionally shared across two kinds of durable tradeoffs:
 
-- date: 2026-03-29
-- status: accepted
-- context: This repository is meant to support agentic coding across multiple tools. Chat history and tool-local state are too fragile to preserve active work when switching IDEs or LLMs.
-- decision: Use committed markdown artifacts as the continuity layer. Every non-trivial change requires a task brief in `docs/ai/tasks/`. Behavior, architecture, workflow, or multi-step work also requires a spec in `docs/specs/` and a plan in `docs/plans/` before implementation begins.
-- consequences: Agents can resume in-flight work from the repo itself instead of hidden session memory. The workflow adds some overhead to larger tasks, but it creates a much stronger handoff surface across tools and sessions.
+- reusable workflow-layer decisions for this repo and its operating model
+- product-owned decisions for the downstream codebase that adopts the starter
 
-### pnpm without Corepack
+Replace the template below with real decisions as those tradeoffs emerge.
 
-- date: 2026-03-29
-- status: accepted
-- context: This starter uses a `pnpm` workspace, but relying on Corepack adds an extra prerequisite and behaves inconsistently across tools and locked-down environments.
-- decision: Use `pnpm` as the workspace package manager without requiring Corepack. Documentation should prefer direct `pnpm` usage when available and allow `npm exec --yes -- pnpm ...` as the fallback path. Repository check scripts should use the fallback automatically when `pnpm` is not globally installed, and they should keep npm cache writes inside the repo when possible.
-- consequences: Setup becomes easier on machines that already have Node and npm, and agent tooling can stay aligned around one package manager. The fallback path may be slower on first use because it can fetch `pnpm`, but it avoids making Corepack a mandatory dependency.
+## What belongs here
+
+- workflow continuity rules that should stay true across tasks and tool switches
+- durable repo-level decisions about validation, packaging, or workspace structure
+- product architecture choices that future contributors could reverse incorrectly without context
+
+## Starter note
+
+When this repo itself changes as a reusable starter, record those decisions here too. Do not treat this file as product-only.
 
 ## Template
 
@@ -28,6 +29,9 @@ Track meaningful technical decisions here.
 - decision:
 - consequences:
 
----
+## Notes
 
-Add new decisions to the top once the project is active.
+- Prefer a new entry when a decision would otherwise be easy to forget or reverse incorrectly.
+- Use `accepted`, `superseded`, or `rejected` for status values if the team wants a simple lifecycle.
+- Avoid recording temporary implementation details here unless they have long-term value.
+- Link to a spec or plan when the decision came out of a larger design discussion.

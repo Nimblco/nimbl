@@ -1,19 +1,12 @@
 # Packages Workspace
 
-Put shared libraries, configs, and internal tooling here.
+Put shared code and shared config here for the same product workspace used by `apps/web` and `apps/api`.
 
-Examples:
+Typical starter packages include:
 
-- `packages/ui`
-- `packages/config-eslint`
-- `packages/config-typescript`
-- `packages/utils`
+- `packages/ui` for shared UI primitives
+- `packages/utils` for reusable helpers and types
+- `packages/config-eslint` for shared lint rules
+- `packages/config-typescript` for shared TypeScript base settings
 
-Each package should have its own `package.json`.
-
-Suggested starting layout:
-
-- `packages/ui`: shared UI components
-- `packages/utils`: shared utility functions
-- `packages/config-eslint`: shared ESLint config
-- `packages/config-typescript`: shared TypeScript config
+Keep each package focused and give it its own `package.json` when it becomes real.

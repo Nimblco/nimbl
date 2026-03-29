@@ -20,7 +20,7 @@ This file is the shared entrypoint for coding agents in this repository.
 
 ## Core workflow
 
-1. Inspect the current code and docs before editing.
+1. Inspect the active task brief and its listed relevant files. Do not scan the entire workspace.
 2. Create or update a task brief in `docs/ai/tasks/` for every non-trivial change.
 3. Create or update a matching spec in `docs/specs/` and plan in `docs/plans/` before implementation when work changes behavior, architecture, workflow, or spans multiple steps.
 4. Make the smallest change that solves the task clearly.

@@ -19,15 +19,15 @@ if [[ -f package.json ]]; then
   ran_something=true
   if [[ -f pnpm-workspace.yaml ]]; then
     if command -v pnpm >/dev/null 2>&1; then
-      run_step "pnpm lint" pnpm run lint --if-present
-      run_step "pnpm test" pnpm test --if-present
-      run_step "pnpm build" pnpm run build --if-present
-      run_step "pnpm typecheck" pnpm run typecheck --if-present
+      run_step "pnpm lint" pnpm run lint
+      run_step "pnpm test" pnpm run test
+      run_step "pnpm build" pnpm run build
+      run_step "pnpm typecheck" pnpm run typecheck
     elif command -v npm >/dev/null 2>&1; then
-      run_step "pnpm lint" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run lint --if-present
-      run_step "pnpm test" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm test --if-present
-      run_step "pnpm build" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run build --if-present
-      run_step "pnpm typecheck" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run typecheck --if-present
+      run_step "pnpm lint" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run lint
+      run_step "pnpm test" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run test
+      run_step "pnpm build" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run build
+      run_step "pnpm typecheck" env npm_config_cache="${npm_cache}" npm exec --yes -- pnpm run typecheck
     else
       echo "Warning: neither pnpm nor npm is installed. Skipping pnpm workspace checks."
     fi

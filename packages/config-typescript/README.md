@@ -1,5 +1,7 @@
-# TypeScript Config Package
+# Shared TypeScript Config
 
-Use this package for shared TypeScript base configs across apps and packages.
+Use this package for the base TypeScript settings shared across the product workspace.
 
-Create a local `package.json` here when you add your TypeScript setup.
+It should support both apps and reusable packages without carrying app-specific assumptions.
+
+Create a local `package.json` here when the TypeScript setup becomes real.

@@ -31,6 +31,7 @@ These rules apply across the repository unless a more specific file says otherwi
 - keep linked artifacts aligned around the same date and topic when practical
 - use markdown checklists (`- [ ]` and `- [x]`) in multi-step plans and in task briefs when progress tracking will help another tool resume work quickly
 - keep the task brief current with status, next action, and blockers so another tool can resume work from the repo alone
+- list the exact files involved under `## Relevant files` so incoming agents do not need to scan the entire workspace
 - tiny wording-only edits may skip artifacts when continuity would not meaningfully benefit
 
 ## Definition of done
