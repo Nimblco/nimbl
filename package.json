@@ -1,13 +1,50 @@
 {
-  "name": "ai-coding-boilerplate",
-  "private": true,
-  "description": "Portable agentic coding workspace scaffold powered by pnpm.",
+  "name": "nimblco",
+  "version": "0.1.0",
+  "description": "Portable agentic coding workflow layer. Embed into any repo to give AI coding agents structured task briefs, specs, plans, and handoff packs.",
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "agents",
+    "workflow",
+    "agentic",
+    "scaffold",
+    "copilot",
+    "claude",
+    "gemini",
+    "codex",
+    "task-brief"
+  ],
+  "bin": {
+    "nimblco": "./scripts/init-workflow.mjs"
+  },
+  "files": [
+    "scripts/",
+    "docs/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    ".editorconfig",
+    ".agent/",
+    ".claude/",
+    ".github/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "lint": "pnpm -r --if-present lint",
     "test": "node --test",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "check": "powershell -ExecutionPolicy Bypass -File .\\scripts\\check.ps1",
-    "workflow": "node ./scripts/workflow.mjs"
+    "workflow": "node ./scripts/workflow.mjs",
+    "init-workflow": "node ./scripts/init-workflow.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nimblco/nimblco.git"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

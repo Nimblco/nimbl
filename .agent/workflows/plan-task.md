@@ -1,3 +1,6 @@
+---
+description: Summarizes constraints, defines implementation paths, and generates task artifacts
+---
 # Plan Task
 
 Use `AGENTS.md`, `docs/ai/subagents/planner.md`, `docs/ai/tasks/TEMPLATE.md`, and the relevant files in `docs/specs/` and `docs/plans/` when the task already has them.

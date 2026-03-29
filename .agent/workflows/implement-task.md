@@ -1,3 +1,6 @@
+---
+description: Securely implements the assigned scope and updates relevant docs and validations
+---
 # Implement Task
 
 Use `AGENTS.md`, `docs/ai/subagents/implementer.md`, the current task brief, and any linked spec or plan before coding.

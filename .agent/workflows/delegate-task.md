@@ -1,3 +1,6 @@
+---
+description: Decides whether a task should remain single-agent or be split and assigns roles
+---
 # Delegate Task
 
 Use `AGENTS.md`, `docs/ai/subagents/README.md`, and `docs/ai/subagents/handoff-contract.md`.

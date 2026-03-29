@@ -1,6 +1,12 @@
-# Reusable Workflow Layer For One-Product Repos
+# Nimblco — Agentic Workflow Layer
 
-This repo is a starter for teams that want a reusable workflow layer around a single product codebase. It is not meant to be a catalog of unrelated products. The goal is to keep durable context, planning artifacts, and task state in the repository so people and coding agents can resume work from the repo itself instead of chat history.
+[![npm version](https://img.shields.io/npm/v/nimblco.svg)](https://www.npmjs.com/package/nimblco)
+[![npm downloads](https://img.shields.io/npm/dm/nimblco.svg)](https://www.npmjs.com/package/nimblco)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A portable workflow layer you can embed into any repository — new or existing, any language or stack — to give AI coding agents a consistent operating model.
+
+The goal is to keep durable context, planning artifacts, and task state in the repository so people and coding agents can resume work from the repo itself instead of relying on chat history.
 
 ## The three layers
 
@@ -19,13 +25,12 @@ Preserve this layer unless you are intentionally changing how the workflow works
 
 ### 2. Product-owned layer
 
-Downstream teams replace the starter placeholders with their actual product context:
+After installing, teams replace the starter placeholders with their actual product context:
 
 - `docs/ai/project-context.md` for durable product facts
 - `docs/ai/architecture.md` for current system shape and boundaries
 - `docs/ai/decisions.md` for durable engineering decisions
 - `docs/ai/future-work.md` for deferred work and known gaps
-- `apps/`, `packages/`, and other product code or docs
 
 This is where the repo should start sounding like the real product instead of the starter.
 
@@ -58,31 +63,59 @@ The workflow layer is designed to stay portable across tools. Keep the shared gu
 - `.github/copilot-instructions.md`, `.github/instructions/`, and `.github/prompts/` cover GitHub Copilot
 - `.agent/` holds Antigravity rules and workflows
 
-## Workspace shape
-
-The starter uses a `pnpm` workspace layout for JavaScript or TypeScript repos. Use `apps/` for the product's runnable surfaces and `packages/` for shared code or configuration that supports that same product.
-
 ## Quick start
 
-This starter does not require Corepack. If `pnpm` is not installed globally, run it through `npm exec --yes -- pnpm ...` instead. In PowerShell, use `npm.cmd` to avoid execution-policy issues with `npm.ps1`.
+### Install into an existing or new repo
 
-For the actual repo workflow onboarding, read `docs/ai/quickstart.md`. The commands below are just the environment bootstrap and validation entry points.
+> **Prerequisite:** Node.js >= 18 is required to run the installer, but the installed workflow layer works in any repository regardless of language or stack.
 
-```powershell
-npm.cmd exec --yes -- pnpm install
-./scripts/bootstrap.ps1
-./scripts/check.ps1
+```bash
+npx nimblco <target-directory>
 ```
 
-If PowerShell blocks direct script execution, use:
+This runs the interactive setup wizard, copies the workflow layer into your target repo, and injects the `workflow` scripts into your existing `package.json` if one is present.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `-y`, `--yes` | Accept all defaults (non-interactive) |
+| `-f`, `--force` | Overwrite existing files |
+| `--include-archives` | Copy archived task/spec/plan history |
+| `-h`, `--help` | Show help |
+
+### Use the workflow CLI in your repo
+
+```bash
+# Create a task brief + spec + plan for a new piece of work
+pnpm workflow scaffold --slug <topic> --artifacts bundle
+
+# Validate the active task brief and linked artifacts
+pnpm workflow check
+
+# Export a portable handoff pack for another AI tool
+pnpm workflow pack --to gemini
+
+# Archive a completed bundle
+pnpm workflow finalize
 ```
+
+See `docs/ai/quickstart.md` for the full workflow onboarding guide.
+
+### Develop or contribute to this repo
+
+This repo does not require Corepack. If `pnpm` is not installed globally, run it through `npm exec --yes -- pnpm ...` instead.
 
 ```bash
 npm exec --yes -- pnpm install
-./scripts/bootstrap.sh
 ./scripts/check.sh
 ```
+
+```powershell
+npm.cmd exec --yes -- pnpm install
+powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1
+```
+
+## License
+
+[MIT](LICENSE)

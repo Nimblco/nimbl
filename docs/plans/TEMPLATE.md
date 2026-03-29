@@ -1,8 +1,14 @@
 # Plan: <change name>
 
-## Goal
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Summarize the outcome this plan should produce.
+**Goal:** Summarize the outcome this plan should produce.
+
+**Architecture:** Describe the implementation approach in a few sentences.
+
+**Tech Stack:** List the key technologies and commands involved.
+
+---
 
 ## References
 
@@ -19,7 +25,7 @@ Summarize the outcome this plan should produce.
 ## Validation
 
 - [ ] Run the relevant targeted checks.
-- [ ] Run the repo's documented validation command(s) from `docs/ai/commands.md`, such as `pnpm run lint`, `pnpm run test`, `pnpm run build`, `pnpm run typecheck`, or `./scripts/check.ps1`, as appropriate for the change.
+- [ ] Run the repo's documented validation command(s) from `docs/ai/commands.md`.
 
 ## Risks
 
