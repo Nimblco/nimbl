@@ -42,6 +42,8 @@ These commands are for contributors working on the Nimblco package itself. If yo
 - `pnpm workflow handoff --to claude`
 - `pnpm workflow resume`
 - `pnpm workflow status`
+- `pnpm workflow pack --compress` writes a handoff pack with a repomix-compressed codebase snapshot appended (requires `npx repomix` to be available)
+- `pnpm workflow skill add <repo>` installs skills from a remote repository using the agentskills.io CLI (for example: `pnpm workflow skill add Nimblco/nimblco`)
 - PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- scaffold --slug <topic> --artifacts bundle`
 - PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- scaffold --slug <topic> --artifacts task`
 - PowerShell fallback without global `pnpm`: `npm.cmd run workflow -- pack --to gemini`

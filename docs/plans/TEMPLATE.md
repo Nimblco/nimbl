@@ -1,6 +1,4 @@
-# Plan: <change name>
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+# <change name> Implementation Plan
 
 **Goal:** Summarize the outcome this plan should produce.
 

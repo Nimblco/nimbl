@@ -1,0 +1,9 @@
+{
+  "customCommands": [
+    {
+      "name": "workflow",
+      "description": "Load the project workflow playbook",
+      "prompt": "Read AGENTS.md as the canonical project playbook and docs/ai/commands.md for the full workflow CLI reference. Run `pnpm workflow doctor` to verify the workflow layer before starting any task. Use `pnpm workflow scaffold`, `check`, `pack`, and `finalize` as described in those files."
+    }
+  ]
+}

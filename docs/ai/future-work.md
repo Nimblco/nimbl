@@ -6,19 +6,18 @@ Keep entries short, actionable, and grouped by theme. This file should stay usef
 
 ## Workflow starter
 
-- [ ] Add a GitHub Actions CI workflow that runs `pnpm run test` on push and pull request
 - [ ] Add a `--dry-run` flag to `workflow scaffold` so agents can preview artifact paths before creating files
 - [ ] Add `workflow rename` or `workflow retitle` to support slug corrections after scaffolding
 
 ## Repo infrastructure
 
-- [ ] Add a GitHub Actions CI workflow that runs `pnpm run test` on push and pull request
+- [x] Add a GitHub Actions CI workflow that runs `pnpm run test` on push and pull request
 - [ ] Set up npm publish automation (release tag triggers `npm publish`)
 
 ## Developer experience
 
-- [ ] Add a `workflow doctor` command that checks for required tools (`node`, `pnpm`, `git`) and validates the repo shape before first use
-- [ ] Explore clipboard fallback detection on Linux during `init-workflow` so users are warned early if no clipboard tool is available
+- [x] Add a `workflow doctor` command that checks for required tools (`node`, `pnpm`, `git`) and validates the repo shape before first use
+- [ ] Explore clipboard fallback detection on Linux during `workflow handoff` so users are warned early if no clipboard tool is available (see `defaultClipboardWriter` in `scripts/workflow-lib.mjs`)
 
 ## Operations
 

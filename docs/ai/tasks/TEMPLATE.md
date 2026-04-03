@@ -1,3 +1,14 @@
+<!-- CLI-parsed fields (keys are case-sensitive; must appear as "- key: value" bullets):
+  status        required  Values: todo | in progress | completed
+  next action   required  Free-text description of the next step
+  blockers      optional  Use "none" when clear
+  spec          optional  Path like docs/specs/YYYY-MM-DD-slug.md  or "none"
+  plan          optional  Path like docs/plans/YYYY-MM-DD-slug.md  or "none" (requires spec when set)
+
+  Wrap file paths in backticks: - spec: `docs/specs/2026-04-04-foo.md`
+  Key capitalisation matters: "- Status: todo" (capital S) will NOT be parsed.
+-->
+
 # Task Brief Template
 
 ## Summary

@@ -20,6 +20,7 @@ This starter provides the shared operating model:
 - `docs/ai/subagents/` for planner, implementer, reviewer, and tester role definitions
 - `scripts/bootstrap.*`, `scripts/check.*`, and the workflow CLI as reusable helpers
 - thin tool adapters for Codex, Claude Code, GitHub Copilot, Gemini, Antigravity, and similar tools
+- `skills/` directory with agentskills.io-compliant skill definitions — installable into any compatible agent tool via `npx skills add Nimblco/nimblco`
 
 Preserve this layer unless you are intentionally changing how the workflow works.
 
@@ -82,22 +83,38 @@ This runs the interactive setup wizard, copies the workflow layer into your targ
 | `-y`, `--yes` | Accept all defaults (non-interactive) |
 | `-f`, `--force` | Overwrite existing files |
 | `--include-archives` | Copy archived task/spec/plan history |
+| `--tools=<list>` | Comma-separated AI tools to install adapters for (e.g. `claude,copilot,cursor`) |
 | `-h`, `--help` | Show help |
 
 ### Use the workflow CLI in your repo
 
 ```bash
+# Pre-flight check: verify the workflow layer is installed correctly
+pnpm workflow doctor
+
 # Create a task brief + spec + plan for a new piece of work
 pnpm workflow scaffold --slug <topic> --artifacts bundle
 
 # Validate the active task brief and linked artifacts
 pnpm workflow check
 
+# Show the active task brief summary
+pnpm workflow status
+
 # Export a portable handoff pack for another AI tool
 pnpm workflow pack --to gemini
 
+# Export a pack with a compressed codebase snapshot
+pnpm workflow pack --compress
+
+# Print a copy-pasteable resume prompt
+pnpm workflow handoff
+
 # Archive a completed bundle
 pnpm workflow finalize
+
+# Install skills into a compatible agent tool
+pnpm workflow skill add Nimblco/nimblco
 ```
 
 See `docs/ai/quickstart.md` for the full workflow onboarding guide.

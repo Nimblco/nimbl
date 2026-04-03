@@ -51,9 +51,15 @@ This file is the shared entrypoint for coding agents in this repository.
 
 ## Tool-specific adapters
 
-- Claude Code: `CLAUDE.md`
+- Claude Code: `CLAUDE.md`, `.claude/rules/`
 - Gemini CLI and Gemini-compatible tools: `GEMINI.md`
 - GitHub Copilot: `.github/copilot-instructions.md`, `.github/instructions/`, `.github/prompts/`
 - Antigravity: `.agent/`
+- Cursor: `.cursor/rules/`
+- Windsurf: `.windsurfrules`
+- Aider: `.aider.conf.yml`
+- Continue: `.continue/config.json`
+- OpenAI Codex: reads `AGENTS.md` natively
+- Agent skills (all tools that support agentskills.io): `skills/`, `.claude-plugin/marketplace.json`
 
 If a tool-specific file conflicts with this file, update the adapter so the shared guidance stays aligned here.

@@ -1,0 +1,5 @@
+# Aider configuration — auto-includes repository context on every session
+read:
+  - AGENTS.md
+  - docs/ai/commands.md
+  - docs/ai/standards.md

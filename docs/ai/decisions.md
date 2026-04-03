@@ -45,6 +45,22 @@ When this repo itself changes as a reusable starter, record those decisions here
 - decision: add a `workflow scaffold` command and keep the workflow CLI non-interactive-first so agents and scripts can create aligned artifacts deterministically; use explicit `none` values for intentionally omitted spec or plan links
 - consequences: `workflow check` can validate clearer task-brief shapes; docs can point to one default entrypoint; interactive helpers remain possible later without becoming the primary interface
 
+### Skills layer aligned with agentskills.io spec
+
+- date: 2026-04-04
+- status: accepted
+- context: the `.claude/rules/` files held guidance that only reached Claude Code users; other agent tools had no discoverable equivalent; the agentskills.io standard defines a `skills/` directory shape that 40+ agent tools can consume via `npx skills add`
+- decision: convert the four `.claude/rules/` behaviour guides into `skills/<name>/SKILL.md` files with compliant YAML frontmatter; add `.claude-plugin/marketplace.json` for Claude Code plugin discovery; keep `.claude/rules/` intact for backward compatibility
+- consequences: guidance is now installable into any agent tool that supports the spec; the `CORE_PATHS` installer list was expanded to include `skills/` and `.claude-plugin/`; downstream repos that install Nimblco receive the full skills layer automatically
+
+### Repomix --compress integrated as optional pack flag
+
+- date: 2026-04-04
+- status: accepted
+- context: handoff packs were useful for task state transfer but contained no codebase snapshot; large codebases require additional context for an incoming agent to reason about the full repo without scanning every file
+- decision: add `pnpm workflow pack --compress` which calls `npx repomix --compress` as an optional side-process and appends the compressed snapshot to the pack; the flag is opt-in and gracefully falls back with an informational note when repomix is unavailable
+- consequences: pack files can optionally carry a token-efficient codebase snapshot; no new required dependency; repomix is fetched on demand via `npx --yes`
+
 ## Notes
 
 - Prefer a new entry when a decision would otherwise be easy to forget or reverse incorrectly.

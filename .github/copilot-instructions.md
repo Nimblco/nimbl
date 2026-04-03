@@ -17,6 +17,7 @@ Read additional files only when relevant:
 - `docs/ai/tasks/`
 - `docs/ai/subagents/README.md`
 - `docs/ai/decisions.md`
+- `skills/` for agentskills.io-compatible skill definitions
 
 When generating code:
 
@@ -30,7 +31,8 @@ When generating code:
 
 Before finalizing implementation, prefer running the repository validation commands:
 
+- `pnpm workflow doctor` to verify the workflow layer is installed
 - `./scripts/check.ps1`
 - `./scripts/check.sh`
 
-Use `.github/instructions/` for path-specific guidance and `.github/prompts/` for reusable task prompts.
+Use `.github/instructions/` for path-specific guidance and `.github/prompts/` for reusable task prompts. For the full CLI reference including `pack --compress`, `pack --to <tool>`, and `skill add`, consult `docs/ai/commands.md`.

@@ -15,7 +15,10 @@ Keep it current enough that a new agent can understand where things live, what b
   - `scripts/check.ps1` / `scripts/check.sh` — cross-platform validation entry points that detect the available toolchain and run lint/test/build/typecheck
   - `scripts/bootstrap.ps1` / `scripts/bootstrap.sh` — install dependencies without requiring global pnpm
 - shared libraries or packages: none — the repo has no workspace packages; all logic is in root-level scripts
-- external services: none — no network calls; reads and writes local files and git only
+- agent skills layer:
+  - `skills/` — agentskills.io-compliant skill definitions; each subdirectory holds a `SKILL.md` with YAML frontmatter; installable via `npx skills add Nimblco/nimblco` into any compatible agent tool
+  - `.claude-plugin/marketplace.json` — Claude Code plugin marketplace descriptor pointing to the `skills/` subdirectories
+- external services: none — no network calls at runtime; reads and writes local files and git only; optional `repomix` and `skills` CLIs are invoked on demand via `npx`
 
 ## Boundaries
 
@@ -24,6 +27,8 @@ Keep it current enough that a new agent can understand where things live, what b
 - `init-workflow.mjs` is intentionally stateful and interactive; it is not tested via the unit test suite
 - doc templates (`docs/specs/TEMPLATE.md`, `docs/plans/TEMPLATE.md`, `docs/ai/tasks/TEMPLATE.md`) must stay in sync with the scaffold output rendered by `renderTaskBriefTemplate`, `renderSpecTemplate`, and `renderPlanTemplate` in `workflow-lib.mjs`
 - tool adapter files (`.claude/`, `.github/`, `.agent/`, `CLAUDE.md`, `GEMINI.md`) must stay thin — they point back to `AGENTS.md` and shared docs rather than duplicating guidance
+- `skills/` must contain only SKILL.md files with valid agentskills.io frontmatter (`name` matching the parent directory name, `description` ≤ 1024 chars); no agent-specific syntax inside SKILL.md bodies
+- `CORE_PATHS` in `init-workflow.mjs` is the authoritative list of what gets copied into target repos; add new top-level directories here when introducing new repo-level layers
 
 ## Data flow and key interfaces
 

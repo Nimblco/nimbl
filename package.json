@@ -1,6 +1,6 @@
 {
   "name": "nimblco",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable agentic coding workflow layer. Embed into any repo to give AI coding agents structured task briefs, specs, plans, and handoff packs.",
   "license": "MIT",
   "keywords": [
@@ -22,13 +22,20 @@
     "scripts/",
     "docs/",
     "!docs/**/archive/",
+    "skills/",
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
     ".editorconfig",
     ".agent/",
+    ".aider.conf.yml",
     ".claude/",
+    ".claude-plugin/",
+    ".continue/",
+    ".cursor/",
     ".github/",
+    ".vscode/extensions.json",
+    ".windsurfrules",
     "README.md",
     "LICENSE"
   ],

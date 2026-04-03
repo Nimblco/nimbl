@@ -1,9 +1,10 @@
+#!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -20,16 +21,10 @@ const c = {
   blue: "\x1b[34m",
 };
 
-const CORE_PATHS = [
+// Files shared by every install regardless of tool selection
+const SHARED_PATHS = [
   "AGENTS.md",
-  "CLAUDE.md",
-  "GEMINI.md",
   ".editorconfig",
-  ".agent",
-  ".claude",
-  ".github/copilot-instructions.md",
-  ".github/instructions",
-  ".github/prompts",
   "docs/ai",
   "docs/plans",
   "docs/specs",
@@ -40,7 +35,28 @@ const CORE_PATHS = [
   "scripts/check.sh",
   "scripts/workflow.mjs",
   "scripts/workflow-lib.mjs",
+  "skills",
 ];
+
+// Per-tool adapter paths — only copied when the tool is selected
+const ADAPTER_PATHS = {
+  claude:      ["CLAUDE.md", ".claude", ".claude-plugin"],
+  copilot:     [".github/copilot-instructions.md", ".github/instructions", ".github/prompts", ".vscode/extensions.json"],
+  cursor:      [".cursor"],
+  windsurf:    [".windsurfrules"],
+  aider:       [".aider.conf.yml"],
+  continue:    [".continue"],
+  gemini:      ["GEMINI.md"],
+  antigravity: [".agent"],
+  codex:       [], // reads AGENTS.md natively — already in SHARED_PATHS
+};
+
+const ALL_TOOLS = Object.keys(ADAPTER_PATHS);
+
+function resolveCorePaths(selectedTools) {
+  const adapterFiles = selectedTools.flatMap((t) => ADAPTER_PATHS[t] ?? []);
+  return [...SHARED_PATHS, ...adapterFiles];
+}
 
 async function pathExists(p) {
   try {
@@ -110,7 +126,7 @@ async function autoDetectEcosystem(targetRoot) {
   return ecosystem;
 }
 
-async function copyLayer(targetDir, force = false, nonInteractive = false, includeArchives = false) {
+async function copyLayer(targetDir, force = false, nonInteractive = false, includeArchives = false, selectedToolsArg = null) {
   const targetRoot = path.resolve(process.cwd(), targetDir);
   const startTime = Date.now();
 
@@ -141,9 +157,12 @@ async function copyLayer(targetDir, force = false, nonInteractive = false, inclu
   let testCmd = ecosystem.test;
   let pkgMgr = ecosystem.mgr;
   let skillsDir = ".agent/skills";
+  let selectedTools = selectedToolsArg ?? [...ALL_TOOLS];
+
+  // Single readline interface shared across both interactive sections
+  const rl = !nonInteractive ? readline.createInterface({ input, output }) : null;
 
   if (!nonInteractive) {
-    const rl = readline.createInterface({ input, output });
     const rawName = await rl.question(`  ${c.cyan}?${c.reset} Project Name ${c.dim}(${defaultName})${c.reset}: `);
     projectName = rawName.trim() || defaultName;
 
@@ -158,12 +177,34 @@ async function copyLayer(targetDir, force = false, nonInteractive = false, inclu
     testCmd = rawTestCmd.trim() || ecosystem.test;
 
     const rawPkgMgr = await rl.question(`  ${c.cyan}?${c.reset} Package manager to invoke workflow scripts ${c.dim}(${ecosystem.mgr})${c.reset}: `);
-    pkgMgr = rawPkgMgr.trim() || ecosystem.mgr;
+    const inputtedPkgMgr = rawPkgMgr.trim() || ecosystem.mgr;
+    const ALLOWED_PKG_MANAGERS = new Set(["pnpm", "npm", "yarn", "bun", "none", "node directly"]);
+    pkgMgr = ALLOWED_PKG_MANAGERS.has(inputtedPkgMgr) ? inputtedPkgMgr : ecosystem.mgr;
 
     const rawSkillsDir = await rl.question(`  ${c.cyan}?${c.reset} Directory for custom AI skills/prompts ${c.dim}(.agent/skills)${c.reset}: `);
     skillsDir = rawSkillsDir.trim() || ".agent/skills";
 
-    rl.close();
+    // Tool selection — only ask if not already specified via --tools flag
+    if (!selectedToolsArg) {
+      const TOOL_DISPLAY = {
+        claude: "Claude Code", copilot: "GitHub Copilot", cursor: "Cursor",
+        windsurf: "Windsurf", aider: "Aider", continue: "Continue",
+        gemini: "Gemini CLI", antigravity: "Antigravity", codex: "Codex",
+      };
+      console.log(`
+  ${c.cyan}?${c.reset} Which AI tools does your team use?`);
+      console.log(`  ${c.dim}Enter comma-separated keys, or press Enter for all.${c.reset}`);
+      ALL_TOOLS.forEach((t, i) => {
+        const recommended = ["claude", "copilot", "cursor"].includes(t);
+        console.log(`  ${c.dim}${String(i + 1).padStart(2)}.${c.reset} ${t.padEnd(12)} ${TOOL_DISPLAY[t]}${recommended ? ` ${c.yellow}(recommended)${c.reset}` : ""}`);
+      });
+      const rawTools = await rl.question(`  ${c.cyan}>${c.reset} `);
+      if (rawTools.trim()) {
+        const parsed = rawTools.split(",").map(t => t.trim().toLowerCase()).filter(t => ALL_TOOLS.includes(t));
+        selectedTools = parsed.length > 0 ? parsed : [...ALL_TOOLS];
+      }
+      console.log(`  ${c.dim}Installing adapters for: ${selectedTools.join(", ")}${c.reset}`);
+    }
   }
   console.log("");
 
@@ -178,7 +219,7 @@ async function copyLayer(targetDir, force = false, nonInteractive = false, inclu
   await sleep(100);
   console.log(`  ${c.green}✔${c.reset} [1/4] Resolved target directories`);
 
-  for (const relPath of CORE_PATHS) {
+  for (const relPath of resolveCorePaths(selectedTools)) {
     const srcPath = path.join(REPO_ROOT, relPath);
     const destPath = path.join(targetRoot, relPath);
 
@@ -258,24 +299,28 @@ async function copyLayer(targetDir, force = false, nonInteractive = false, inclu
   console.log(`  ${c.dim}1.${c.reset} Open the target repo cleanly in your IDE.`);
   
   if (!nonInteractive) {
-    const rlTask = readline.createInterface({ input, output });
     console.log("");
-    const doFirstTask = await rlTask.question(`  ${c.cyan}?${c.reset} Do you want to scaffold your first AI task right now? ${c.dim}(y/N)${c.reset}: `);
+    const doFirstTask = await rl.question(`  ${c.cyan}?${c.reset} Do you want to scaffold your first AI task right now? ${c.dim}(y/N)${c.reset}: `);
     
     if (doFirstTask.toLowerCase() === 'y' || doFirstTask.toLowerCase() === 'yes') {
-      const taskName = await rlTask.question(`  ${c.cyan}?${c.reset} What are you going to build? ${c.dim}(e.g., 'Add user authentication')${c.reset}: `);
+      const taskName = await rl.question(`  ${c.cyan}?${c.reset} What are you going to build? ${c.dim}(e.g., 'Add user authentication')${c.reset}: `);
       const safeTopic = taskName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') || "initial-task";
       
       console.log(`\n  ${c.dim}Building your first task via internal workflow engine...${c.reset}`);
       try {
-        const scriptPrefix = (pkgMgr.includes("node directly") || pkgMgr === "none") ? "node ./scripts/workflow.mjs" : `${pkgMgr === "npm" ? "npm run" : pkgMgr} workflow`;
-        execSync(`${scriptPrefix} scaffold --slug ${safeTopic} --artifacts bundle`, { cwd: targetRoot, stdio: "ignore" });
+        const isDirectNode = pkgMgr.includes("node directly") || pkgMgr === "none";
+        if (isDirectNode) {
+          execFileSync("node", ["./scripts/workflow.mjs", "scaffold", "--slug", safeTopic, "--artifacts", "bundle"], { cwd: targetRoot, stdio: "ignore" });
+        } else {
+          const [bin, ...binArgs] = pkgMgr === "npm" ? ["npm", "run", "workflow", "--"] : [pkgMgr, "workflow"];
+          execFileSync(bin, [...binArgs, "scaffold", "--slug", safeTopic, "--artifacts", "bundle"], { cwd: targetRoot, stdio: "ignore" });
+        }
         console.log(`  ${c.green}✔ First task scaffolded successfully!${c.reset}\n`);
       } catch (e) {
         console.log(`  ${c.red}✖ Failed to scaffold automatically: ${e.message}${c.reset}\n`);
       }
     }
-    rlTask.close();
+    rl.close();
   }
 
   console.log(`  ${c.dim}2.${c.reset} Tell your AI agent (Claude Code, Antigravity, Copilot):`);
@@ -595,21 +640,33 @@ async function customizeToolSupportMatrix(targetRoot) {
 async function injectGitignoreEntries(targetRoot) {
   const gitignorePath = path.join(targetRoot, ".gitignore");
   const marker = "# AI Workflow";
-  const entries = [
-    "",
-    marker,
-    "docs/ai/handoffs/",
-    "tmp/",
-    "",
-  ].join("\n");
+  const managedEntries = ["docs/ai/handoffs/", "tmp/"];
 
   try {
     let existing = "";
     if (await pathExists(gitignorePath)) {
       existing = await fs.readFile(gitignorePath, "utf-8");
-      if (existing.includes(marker)) return; // already injected
     }
-    await fs.writeFile(gitignorePath, existing + entries, "utf-8");
+
+    const missing = managedEntries.filter(e => !existing.includes(e));
+    if (missing.length === 0) return; // all entries already present
+
+    if (existing.includes(marker)) {
+      // Block exists — append only the missing entries after the existing block
+      // Find the end of the marker block and splice in new entries there
+      const markerIdx = existing.indexOf(marker);
+      const afterMarker = existing.indexOf("\n", markerIdx);
+      // Find next blank line or EOF after the marker to know where block ends
+      const afterBlock = existing.indexOf("\n\n", afterMarker + 1);
+      const insertAt = afterBlock === -1 ? existing.length : afterBlock;
+      const toInsert = "\n" + missing.join("\n");
+      existing = existing.slice(0, insertAt) + toInsert + existing.slice(insertAt);
+    } else {
+      // No marker yet — append a new block
+      const block = ["\n", marker, ...managedEntries, ""].join("\n");
+      existing = existing + block;
+    }
+    await fs.writeFile(gitignorePath, existing, "utf-8");
   } catch (err) {
     console.warn(`  ${c.yellow}⚠ Failed to update .gitignore: ${err.message}${c.reset}`);
   }
@@ -728,7 +785,10 @@ async function injectScriptsToPackageJson(targetRoot) {
     }
 
     if (changed) {
-      await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+      // Detect indentation from original file so we don't reformat the user's package.json
+      const indentMatch = content.match(/^(\s+)"/m);
+      const indent = indentMatch ? indentMatch[1] : "  ";
+      await fs.writeFile(pkgPath, JSON.stringify(pkg, null, indent) + "\n");
     }
   } catch (err) {
     console.warn(`  ${c.yellow}⚠ Failed to inject scripts into package.json: ${err.message}${c.reset}`);
@@ -799,12 +859,24 @@ async function injectGitHook(targetRoot, pkgMgr) {
     if (!(await pathExists(gitHooksDir))) return; // Only inject if git is initialized
 
     const preCommitPath = path.join(gitHooksDir, "pre-commit");
-    const scriptPrefix = pkgMgr.includes("node") || pkgMgr === "none" ? "node ./scripts/workflow.mjs" : (pkgMgr === "npm" ? "npm run" : pkgMgr) + " workflow";
+    const isDirectNode = pkgMgr.includes("node") || pkgMgr === "none";
+    const scriptPrefix = isDirectNode ? "node ./scripts/workflow.mjs" : (pkgMgr === "npm" ? "npm run" : pkgMgr) + " workflow";
 
-    const hookContent = `#!/bin/sh
-# Auto-generated by AI agentic workflow scaffold
+    const MARKER = "# nimblco-workflow-check";
 
+    // Don't inject if already present
+    if (await pathExists(preCommitPath)) {
+      const existing = await fs.readFile(preCommitPath, "utf-8");
+      if (existing.includes(MARKER)) return;
+    }
+
+    const nimblcoHook = `
+${MARKER}
 echo "[AI Pre-commit Hook]: Validating agentic workflow artifacts..."
+
+# Load nvm/fnm if available so node is on PATH in non-interactive shells
+if [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; fi
+if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi
 
 # Check if Node is installed so we don't break non-JS repos
 if command -v node >/dev/null 2>&1; then
@@ -816,10 +888,18 @@ if command -v node >/dev/null 2>&1; then
     exit 1
   fi
 else
-  echo "[AI Pre-commit Hook]: Node.js not detected. Skipping AI artifact validation."
+  echo "[AI Pre-commit Hook]: Node.js not detected on PATH. Skipping AI artifact validation."
+  echo "If you use nvm or fnm, ensure your shell profile exports node to non-interactive shells."
 fi
 `;
-    await fs.writeFile(preCommitPath, hookContent, { encoding: "utf-8", mode: 0o755 });
+
+    if (await pathExists(preCommitPath)) {
+      // Append to existing hook
+      const existing = await fs.readFile(preCommitPath, "utf-8");
+      await fs.writeFile(preCommitPath, existing.trimEnd() + "\n" + nimblcoHook, { encoding: "utf-8", mode: 0o755 });
+    } else {
+      await fs.writeFile(preCommitPath, `#!/bin/sh\n${nimblcoHook}`, { encoding: "utf-8", mode: 0o755 });
+    }
   } catch (err) {
     console.warn(`  ${c.yellow}⚠ Failed to inject Git Hook: ${err.message}${c.reset}`);
   }
@@ -831,6 +911,7 @@ async function main() {
   let force = false;
   let nonInteractive = false;
   let includeArchives = false;
+  let selectedTools = null; // null = ask interactively
 
   for (const arg of args) {
     if (arg === "--help" || arg === "-h") {
@@ -846,15 +927,28 @@ async function main() {
       console.log(`    ${c.bold}-f, --force${c.reset}              Overwrite existing files`);
       console.log(`    ${c.bold}-y, --yes${c.reset}                Accept all defaults (non-interactive)`);
       console.log(`    ${c.bold}--include-archives${c.reset}       Copy archived tasks/plans/specs history`);
+      console.log(`    ${c.bold}--tools=<list>${c.reset}           Comma-separated AI tools to install adapters for`);
+      console.log(`    ${c.dim}                         Options: ${ALL_TOOLS.join(", ")}${c.reset}`);
+      console.log(`    ${c.dim}                         Recommended: claude, copilot, cursor${c.reset}`);
       console.log(`    ${c.bold}-h, --help${c.reset}               Show this help menu`);
       console.log("");
       process.exit(0);
     } else if (arg === "--force" || arg === "-f") {
       force = true;
+      if (!nonInteractive) {
+        console.warn(`  ${"\x1b[33m"}⚠ --force: existing workflow files will be overwritten.${"\x1b[0m"}`);
+      }
     } else if (arg === "--yes" || arg === "-y") {
       nonInteractive = true;
     } else if (arg === "--include-archives") {
       includeArchives = true;
+    } else if (arg.startsWith("--tools=")) {
+      const toolList = arg.slice("--tools=".length).split(",").map(t => t.trim().toLowerCase());
+      selectedTools = toolList.filter(t => ALL_TOOLS.includes(t));
+      if (selectedTools.length === 0) {
+        console.error(`  ${"\x1b[31m"}✖ --tools: no valid tools specified. Options: ${ALL_TOOLS.join(", ")}${"\x1b[0m"}`);
+        process.exit(1);
+      }
     } else if (!arg.startsWith("-")) {
       targetDir = arg;
     }
@@ -870,12 +964,25 @@ async function main() {
     process.exit(1);
   }
 
-  await copyLayer(targetDir, force, nonInteractive, includeArchives);
+  await copyLayer(targetDir, force, nonInteractive, includeArchives, selectedTools);
 }
 
-main().catch((err) => {
-  console.error("");
-  console.error(`  ${c.red}✖ Fatal Error:${c.reset} ${err.message}`);
-  console.error("");
-  process.exit(1);
-});
+// Allow importing this module in tests without triggering the interactive CLI
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error("");
+    console.error(`  ${c.red}✖ Fatal Error:${c.reset} ${err.message}`);
+    console.error("");
+    process.exit(1);
+  });
+}
+
+export {
+  resolveCorePaths,
+  injectGitignoreEntries,
+  injectScriptsToPackageJson,
+  injectGitHook,
+  ALL_TOOLS,
+  ADAPTER_PATHS,
+  SHARED_PATHS,
+};

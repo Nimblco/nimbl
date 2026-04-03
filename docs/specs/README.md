@@ -21,4 +21,4 @@ Create or update a spec when work changes behavior, architecture, workflow, or s
 - Active specs live in this directory.
 - Completed specs are moved to `archive/` by `pnpm workflow finalize` or `pnpm workflow archive`.
 
-See `TEMPLATE.md` for the workflow scaffold template and `SPEC-TEMPLATE.md` for a more detailed technical spec format.
+See `TEMPLATE.md` for the workflow scaffold template.

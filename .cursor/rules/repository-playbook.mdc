@@ -1,0 +1,44 @@
+---
+description: Repository coding agent playbook
+alwaysApply: true
+---
+
+# Repository Playbook
+
+Use `AGENTS.md` as the canonical project playbook.
+
+Before starting work, run `pnpm workflow doctor` to verify the workflow layer is installed, then check for active tasks with `pnpm workflow status` or by inspecting `docs/ai/tasks/`.
+
+## Always read
+
+- `AGENTS.md`
+- `docs/ai/commands.md`
+- `docs/ai/standards.md`
+
+## Read when relevant
+
+- `docs/ai/project-context.md`
+- `docs/ai/architecture.md`
+- `docs/specs/`, `docs/plans/`, `docs/ai/tasks/`
+- `docs/ai/decisions.md`
+- `skills/` for agentskills.io-compatible skill definitions
+
+## Workflow CLI
+
+| Command | Purpose |
+|---|---|
+| `pnpm workflow doctor` | Pre-flight check — verify the workflow layer is installed |
+| `pnpm workflow scaffold --slug <topic>` | Create a dated task brief, spec, and plan |
+| `pnpm workflow check` | Validate the active task brief |
+| `pnpm workflow pack [--compress] [--to <tool>]` | Write a handoff pack to `docs/ai/handoffs/` |
+| `pnpm workflow finalize` | Archive completed task brief, spec, and plan |
+| `pnpm workflow skill add <repo>` | Install agentskills.io-compatible skills from a remote repo |
+
+## Working expectations
+
+- prefer small, reviewable changes
+- create or update a task brief in `docs/ai/tasks/` for every non-trivial change
+- create or update matching specs and plans before implementation for behavior, architecture, workflow, or multi-step work
+- append an ADR to `docs/ai/decisions.md` when introducing a new framework, dependency, or design pattern
+- do not overwrite user changes without approval
+- run `pnpm workflow doctor` before starting, then `pnpm workflow check` after changes

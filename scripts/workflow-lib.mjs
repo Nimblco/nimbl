@@ -1,5 +1,6 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const TASKS_DIRECTORY = path.join("docs", "ai", "tasks");
@@ -67,8 +68,8 @@ function normalizeSlug(value) {
   const slug = value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
   return slug || null;
 }
@@ -107,6 +108,7 @@ function readTaskBrief(taskPath, repoRoot) {
   const fields = new Map();
   const validationCommands = [];
   const relevantFiles = [];
+  const handoffNoteLines = [];
   let currentSection = "";
 
   for (const line of lines) {
@@ -123,13 +125,13 @@ function readTaskBrief(taskPath, repoRoot) {
       fields.set(fieldMatch[1].trim().toLowerCase(), cleanFieldValue(fieldMatch[2]));
     }
 
-    if (currentSection === "validation") {
+    if (currentSection === "validation" || currentSection.startsWith("validation ")) {
       const validationMatch = line.match(/^- (.+)$/u);
 
       if (validationMatch) {
         validationCommands.push(validationMatch[1].trim());
       }
-    } else if (currentSection === "relevant files") {
+    } else if (currentSection === "relevant files" || currentSection.startsWith("relevant file")) {
       const fileMatch = line.match(/^- (.+)$/u);
 
       if (fileMatch) {
@@ -138,6 +140,11 @@ function readTaskBrief(taskPath, repoRoot) {
         if (fp) {
           relevantFiles.push(fp);
         }
+      }
+    } else if (currentSection === "handoff notes" || currentSection.startsWith("handoff note")) {
+      const noteMatch = line.match(/^- (.+)$/u);
+      if (noteMatch && !noteMatch[1].trim().startsWith("anything the next agent")) {
+        handoffNoteLines.push(noteMatch[1].trim());
       }
     }
   }
@@ -150,6 +157,7 @@ function readTaskBrief(taskPath, repoRoot) {
     blockers: fields.get("blockers") ?? null,
     spec: fields.get("spec") ?? null,
     plan: fields.get("plan") ?? null,
+    handoffNotes: handoffNoteLines.length > 0 ? handoffNoteLines.join("; ") : null,
     validationCommands,
     relevantFiles,
   };
@@ -274,6 +282,10 @@ function renderStatus(taskBrief) {
     `Plan: ${taskBrief.plan ?? "none"}`,
   ];
 
+  if (taskBrief.handoffNotes) {
+    lines.push(`Handoff notes: ${taskBrief.handoffNotes}`);
+  }
+
   if (taskBrief.relevantFiles && taskBrief.relevantFiles.length > 0) {
     lines.push(`Relevant files: ${taskBrief.relevantFiles.join(", ")}`);
   }
@@ -305,23 +317,23 @@ function validateTaskBrief(taskBrief, repoRoot) {
   const issues = [];
 
   if (!taskBrief.status) {
-    issues.push("Missing required field: status");
+    issues.push('Missing required field: status — add "- status: todo" under ## Current state');
   }
 
   if (!taskBrief.nextAction) {
-    issues.push("Missing required field: next action");
+    issues.push('Missing required field: next action — add "- next action: <description>" under ## Current state');
   }
 
   if (taskBrief.plan && !taskBrief.spec) {
-    issues.push("A linked plan requires a linked spec.");
+    issues.push("A linked plan requires a linked spec — add a spec link or change the plan to none");
   }
 
   if (taskBrief.spec && !fs.existsSync(resolveLinkedPath(repoRoot, taskBrief.spec))) {
-    issues.push(`Linked spec does not exist: ${taskBrief.spec}`);
+    issues.push(`Linked spec does not exist: ${taskBrief.spec} — create the file or change spec to none`);
   }
 
   if (taskBrief.plan && !fs.existsSync(resolveLinkedPath(repoRoot, taskBrief.plan))) {
-    issues.push(`Linked plan does not exist: ${taskBrief.plan}`);
+    issues.push(`Linked plan does not exist: ${taskBrief.plan} — create the file or change plan to none`);
   }
 
   if (taskBrief.relevantFiles && taskBrief.relevantFiles.length > 0) {
@@ -446,7 +458,14 @@ function buildPackContent(
 
 function resolvePackOutputPath(repoRoot, taskBrief, outputPath) {
   if (outputPath) {
-    return path.isAbsolute(outputPath) ? outputPath : path.join(repoRoot, outputPath);
+    const resolved = path.isAbsolute(outputPath)
+      ? path.resolve(outputPath)
+      : path.resolve(repoRoot, outputPath);
+    const normalizedRoot = path.resolve(repoRoot);
+    if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
+      throw new WorkflowError(`--output path must be inside the repository: ${outputPath}`);
+    }
+    return resolved;
   }
 
   const filename = `${path.basename(taskBrief.absolutePath, ".md")}-handoff.md`;
@@ -602,8 +621,6 @@ Describe the behavior, workflow, or architecture change at a level that another 
 function renderPlanTemplate({ title, taskPath, specPath }) {
   return `# ${title} Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
-
 **Goal:** Summarize the outcome this plan should produce.
 
 **Architecture:** Describe the implementation approach in a few sentences.
@@ -641,12 +658,17 @@ function renderPlanTemplate({ title, taskPath, specPath }) {
 }
 
 function writeScaffoldFile(entry, content, createdEntries, repoRoot) {
-  if (fs.existsSync(entry.absolutePath)) {
-    throw new WorkflowError(`Scaffold destination already exists: ${entry.relativePath}`);
-  }
-
   fs.mkdirSync(path.dirname(entry.absolutePath), { recursive: true });
-  fs.writeFileSync(entry.absolutePath, content);
+  try {
+    const fd = fs.openSync(entry.absolutePath, "wx");
+    fs.writeSync(fd, content);
+    fs.closeSync(fd);
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      throw new WorkflowError(`Scaffold destination already exists: ${entry.relativePath}`);
+    }
+    throw error;
+  }
   createdEntries.push({
     absolutePath: entry.absolutePath,
     relativePath: entry.relativePath,
@@ -657,7 +679,9 @@ function scaffoldWorkflowArtifacts(repoRoot, { slug, artifacts, now }) {
   const normalizedSlug = normalizeSlug(slug);
 
   if (!normalizedSlug) {
-    throw new WorkflowError("Missing or invalid value for --slug.");
+    throw new WorkflowError(
+      'Missing or invalid value for --slug — try: workflow scaffold --slug <topic> --artifacts bundle',
+    );
   }
 
   if (!SCAFFOLD_ARTIFACT_MODES.has(artifacts)) {
@@ -787,7 +811,7 @@ function rewriteArchivedTaskBriefContent(content, replacements) {
       currentSection = headingMatch[1].trim().toLowerCase();
     }
 
-    if (currentSection === "validation" && line.startsWith("- ") && /\bfinalize\b/u.test(line)) {
+    if (currentSection === "validation" && line.startsWith("- ") && line.includes("workflow finalize")) {
       continue;
     }
 
@@ -795,6 +819,10 @@ function rewriteArchivedTaskBriefContent(content, replacements) {
   }
 
   let rewrittenContent = filteredLines.join("\n");
+  // Preserve a trailing newline if the original content had one
+  if (content.endsWith("\n") && !rewrittenContent.endsWith("\n")) {
+    rewrittenContent += "\n";
+  }
 
   for (const replacement of replacements) {
     if (replacement.from && replacement.to && replacement.from !== replacement.to) {
@@ -810,6 +838,20 @@ function renderArchivedBundleSummary(action, archivedEntries) {
     `${action} workflow bundle:`,
     ...archivedEntries.map((entry) => `- ${entry.label}: ${entry.path}`),
   ].join("\n");
+}
+
+function moveFileSync(src, dest) {
+  try {
+    fs.renameSync(src, dest);
+  } catch (err) {
+    if (err.code === "EXDEV") {
+      // Cross-device move: copy then delete source
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+    } else {
+      throw err;
+    }
+  }
 }
 
 function archiveTaskBundle(taskBrief, repoRoot) {
@@ -842,18 +884,29 @@ function archiveTaskBundle(taskBrief, repoRoot) {
     .slice()
     .sort((left, right) => ["spec", "plan", "task"].indexOf(left.key) - ["spec", "plan", "task"].indexOf(right.key));
   const movedEntries = [];
+  let tmpPath = null;
 
   try {
     for (const entry of moveOrder) {
-      fs.renameSync(entry.sourcePath, entry.destPath);
+      moveFileSync(entry.sourcePath, entry.destPath);
       movedEntries.push(entry);
     }
 
-    fs.writeFileSync(taskEntry.destPath, rewriteArchivedTaskBriefContent(taskContent, replacements));
+    // Write rewritten content atomically via a temp file so a partial write
+    // doesn't corrupt the archive and the rollback can safely move the file back.
+    tmpPath = taskEntry.destPath + ".tmp";
+    fs.writeFileSync(tmpPath, rewriteArchivedTaskBriefContent(taskContent, replacements));
+    fs.renameSync(tmpPath, taskEntry.destPath);
+    tmpPath = null;
   } catch (error) {
+    // Clean up temp file if it was created before the rename
+    if (tmpPath) {
+      try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    }
+
     for (const entry of movedEntries.slice().reverse()) {
       if (fs.existsSync(entry.destPath) && !fs.existsSync(entry.sourcePath)) {
-        fs.renameSync(entry.destPath, entry.sourcePath);
+        moveFileSync(entry.destPath, entry.sourcePath);
       }
     }
 
@@ -863,6 +916,118 @@ function archiveTaskBundle(taskBrief, repoRoot) {
   }
 
   return moveOrder.map((entry) => ({ label: entry.label, path: entry.destRelativePath }));
+}
+
+function runDoctor(repoRoot, commandRunner) {
+  const results = [];
+
+  // 1. Node.js version
+  const nodeVersion = process.version;
+  const nodeMajor = parseInt(nodeVersion.replace("v", "").split(".")[0], 10);
+  if (nodeMajor >= 18) {
+    results.push({ status: "pass", label: `Node.js ${nodeVersion} (>=18 required)` });
+  } else {
+    results.push({ status: "fail", label: `Node.js ${nodeVersion} is below required >=18`, hint: "upgrade Node.js to version 18 or later" });
+  }
+
+  // 2. git available
+  try {
+    commandRunner("git --version", { cwd: repoRoot });
+    results.push({ status: "pass", label: "git available" });
+  } catch {
+    results.push({ status: "fail", label: "git not found", hint: "install git and ensure it is on your PATH" });
+  }
+
+  // 3. docs/ai/ directory
+  const docsAiDir = path.join(repoRoot, "docs", "ai");
+  if (fs.existsSync(docsAiDir) && fs.statSync(docsAiDir).isDirectory()) {
+    results.push({ status: "pass", label: "docs/ai/ directory present" });
+  } else {
+    results.push({ status: "fail", label: "docs/ai/ directory missing", hint: "run npx nimblco . to reinstall the workflow layer" });
+  }
+
+  // 4. docs/ai/commands.md
+  const commandsFile = path.join(repoRoot, "docs", "ai", "commands.md");
+  if (fs.existsSync(commandsFile)) {
+    results.push({ status: "pass", label: "docs/ai/commands.md present" });
+  } else {
+    results.push({ status: "fail", label: "docs/ai/commands.md missing", hint: "create it or run npx nimblco . to reinstall" });
+  }
+
+  // 5. docs/ai/tasks/ directory
+  const tasksDir = path.join(repoRoot, TASKS_DIRECTORY);
+  if (fs.existsSync(tasksDir) && fs.statSync(tasksDir).isDirectory()) {
+    results.push({ status: "pass", label: "docs/ai/tasks/ directory present" });
+  } else {
+    results.push({ status: "fail", label: "docs/ai/tasks/ directory missing", hint: "run npx nimblco . to reinstall the workflow layer" });
+  }
+
+  // 6. scripts/workflow.mjs
+  const workflowScript = path.join(repoRoot, "scripts", "workflow.mjs");
+  if (fs.existsSync(workflowScript)) {
+    results.push({ status: "pass", label: "scripts/workflow.mjs present" });
+  } else {
+    results.push({ status: "fail", label: "scripts/workflow.mjs missing", hint: "run npx nimblco . to reinstall the workflow CLI" });
+  }
+
+  // 7. active task brief count
+  let activeBriefs = [];
+  try {
+    const briefs = listTaskBriefs(repoRoot);
+    activeBriefs = briefs.filter((b) => b.status?.toLowerCase() !== "completed");
+  } catch {
+    // listTaskBriefs may throw if tasks dir missing; already reported above
+  }
+  if (activeBriefs.length <= 1) {
+    results.push({ status: "pass", label: `active task briefs: ${activeBriefs.length}` });
+  } else {
+    results.push({ status: "warn", label: `${activeBriefs.length} active task briefs found`, hint: "resolve or finalize existing tasks before scaffolding new work" });
+  }
+
+  return results;
+}
+
+function renderDoctorReport(results) {
+  const total = results.length;
+  const failCount = results.filter((r) => r.status === "fail").length;
+  const warnCount = results.filter((r) => r.status === "warn").length;
+  const lines = [`Workflow doctor: ${total} checks`, ""];
+
+  for (const result of results) {
+    const icon = result.status === "pass" ? "✓" : result.status === "warn" ? "⚠" : "✗";
+    if (result.hint) {
+      lines.push(`${icon} ${result.label} — ${result.hint}`);
+    } else {
+      lines.push(`${icon} ${result.label}`);
+    }
+  }
+
+  if (failCount === 0 && warnCount === 0) {
+    lines.push("", "All checks passed.");
+  } else if (failCount === 0) {
+    lines.push("", `${warnCount} warning(s). Repository is usable.`);
+  } else {
+    lines.push("", `${failCount} check(s) failed. Fix the issues above before running workflow commands.`);
+  }
+
+  return { text: lines.join("\n"), hasFailures: failCount > 0 };
+}
+
+function readRepomixSnapshot(repoRoot, commandRunner) {
+  const tmpFile = path.join(os.tmpdir(), `nimblco-repomix-${Date.now()}.xml`);
+  try {
+    commandRunner(`npx --yes repomix --compress --output "${tmpFile}"`, { cwd: repoRoot });
+    const content = fs.readFileSync(tmpFile, "utf8");
+    return { content, error: null };
+  } catch (error) {
+    return { content: "", error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {
+      // ignore cleanup failure
+    }
+  }
 }
 
 function renderHelp() {
@@ -878,6 +1043,8 @@ function renderHelp() {
     "  check             Validate the selected task brief and linked artifacts",
     "  finalize          Validate and archive a completed workflow bundle",
     "  archive           Archive the selected completed workflow bundle",
+    "  skill             Run a skills CLI command (for example: skill add <repo>)",
+    "  doctor            Run pre-flight checks on the workflow layer health",
     "",
     "Options:",
     "  --task <path>     Use an explicit task brief path or filename",
@@ -887,7 +1054,10 @@ function renderHelp() {
     "  --output <path>   Output path override for workflow pack",
     "  --stdout          Print the workflow pack instead of writing a file",
     "  --include-diff    Include git diff details in the workflow pack",
+    "  --compress        Append a repomix codebase snapshot to the pack",
+    "  --dry-run         Preview what finalize/archive would do without moving files",
     "  --copy            Copy output to clipboard (handoff, resume, pack)",
+    "  --version         Print the workflow CLI version",
     "  --help            Show this help text",
   ].join("\n");
 }
@@ -901,8 +1071,10 @@ function parseArguments(argv) {
   let output = null;
   let stdoutMode = false;
   let includeDiff = false;
+  let compress = false;
   let help = false;
   let copy = false;
+  let dryRun = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -917,6 +1089,11 @@ function parseArguments(argv) {
       continue;
     }
 
+    if (argument === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+
     if (argument === "--stdout") {
       stdoutMode = true;
       continue;
@@ -924,6 +1101,11 @@ function parseArguments(argv) {
 
     if (argument === "--include-diff") {
       includeDiff = true;
+      continue;
+    }
+
+    if (argument === "--compress") {
+      compress = true;
       continue;
     }
 
@@ -993,7 +1175,7 @@ function parseArguments(argv) {
     command = argument;
   }
 
-  return { command, task, target, slug, artifacts, output, stdoutMode, includeDiff, help, copy };
+  return { command, task, target, slug, artifacts, output, stdoutMode, includeDiff, compress, help, copy, dryRun };
 }
 
 function defaultClipboardWriter(text) {
@@ -1033,11 +1215,23 @@ function defaultClipboardWriter(text) {
   throw new WorkflowError(`Clipboard support is not available for platform: ${platform}`);
 }
 
-function defaultCommandRunner(command, options = {}) {
+function defaultCommandRunner(command, argsOrOptions = {}, maybeOptions = {}) {
+  // Supports two calling conventions:
+  //   commandRunner("git --version", { cwd })         — legacy shell string
+  //   commandRunner("npx", ["skills", "add", repo], { cwd })  — safe array form
+  if (Array.isArray(argsOrOptions)) {
+    const { cwd, ...rest } = maybeOptions;
+    return execFileSync(command, argsOrOptions, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd,
+      ...rest,
+    });
+  }
   return execSync(command, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    ...options,
+    ...argsOrOptions,
   });
 }
 
@@ -1051,6 +1245,34 @@ export function runCli(
   } = {},
 ) {
   try {
+    if (argv[0] === "--version" || argv[0] === "-v") {
+      const pkgPath = new URL("../package.json", import.meta.url);
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      return { exitCode: 0, stdout: `workflow v${pkg.version}`, stderr: "" };
+    }
+
+    if (argv[0] === "skill") {
+      const skillArgs = argv.slice(1);
+      if (skillArgs.includes("--help") || skillArgs.includes("-h")) {
+        return { exitCode: 0, stdout: renderHelp(), stderr: "" };
+      }
+      const ALLOWED_SKILL_SUBCOMMANDS = new Set(["add", "list", "remove", "update"]);
+      if (skillArgs.length > 0 && !ALLOWED_SKILL_SUBCOMMANDS.has(skillArgs[0])) {
+        throw new WorkflowError(`Unknown skill subcommand: ${skillArgs[0]}. Allowed: ${[...ALLOWED_SKILL_SUBCOMMANDS].join(", ")}`);
+      }
+      const skillOutput = commandRunner("npx", ["skills", ...skillArgs], { cwd: repoRoot });
+      return { exitCode: 0, stdout: skillOutput ?? "", stderr: "" };
+    }
+
+    if (argv[0] === "doctor") {
+      if (argv.includes("--help") || argv.includes("-h")) {
+        return { exitCode: 0, stdout: renderHelp(), stderr: "" };
+      }
+      const results = runDoctor(repoRoot, commandRunner);
+      const report = renderDoctorReport(results);
+      return { exitCode: report.hasFailures ? 1 : 0, stdout: report.text, stderr: "" };
+    }
+
     const {
       command,
       task,
@@ -1060,8 +1282,10 @@ export function runCli(
       output,
       stdoutMode,
       includeDiff,
+      compress,
       help,
       copy,
+      dryRun,
     } = parseArguments(argv);
 
     if (copy && command !== "handoff" && command !== "resume" && command !== "pack") {
@@ -1086,6 +1310,10 @@ export function runCli(
 
     if (includeDiff && command !== "pack") {
       throw new WorkflowError("--include-diff is only supported by the pack command.");
+    }
+
+    if (compress && command !== "pack") {
+      throw new WorkflowError("--compress is only supported by the pack command.");
     }
 
     if (target && !(target in TARGET_ADAPTERS)) {
@@ -1119,13 +1347,22 @@ export function runCli(
         throw new WorkflowError("--stdout cannot be combined with --output.");
       }
 
-      const packText = buildPackContent(taskBrief, {
+      let packText = buildPackContent(taskBrief, {
         repoRoot,
         target: target ?? null,
         commandRunner,
         includeDiff,
         generatedAt: now,
       });
+
+      if (compress) {
+        const snapshot = readRepomixSnapshot(repoRoot, commandRunner);
+        if (snapshot.error) {
+          packText += `\n## Codebase Snapshot\n\nrepomix unavailable: ${snapshot.error}\n`;
+        } else {
+          packText += `\n## Codebase Snapshot (repomix --compress)\n\n\`\`\`xml\n${snapshot.content.trim()}\n\`\`\`\n`;
+        }
+      }
 
       if (copy) {
         clipboardWriter(packText);
@@ -1234,6 +1471,13 @@ export function runCli(
         throw new WorkflowError(`Finalize requires a completed task brief: ${taskBrief.relativePath}`);
       }
 
+      const bundleEntries = resolveTaskBundle(taskBrief, repoRoot);
+
+      if (dryRun) {
+        const lines = ["Dry run — finalize would move:", ...bundleEntries.map((e) => `  ${e.sourceRelativePath} → ${e.destRelativePath}`)];
+        return { exitCode: 0, stdout: lines.join("\n"), stderr: "" };
+      }
+
       const archivedEntries = archiveTaskBundle(taskBrief, repoRoot);
 
       return {
@@ -1247,6 +1491,14 @@ export function runCli(
       if (taskBrief.status?.toLowerCase() !== "completed") {
         throw new WorkflowError(`Cannot archive task because its status is not completed: ${taskBrief.relativePath}`);
       }
+
+      const bundleEntries = resolveTaskBundle(taskBrief, repoRoot);
+
+      if (dryRun) {
+        const lines = ["Dry run — archive would move:", ...bundleEntries.map((e) => `  ${e.sourceRelativePath} → ${e.destRelativePath}`)];
+        return { exitCode: 0, stdout: lines.join("\n"), stderr: "" };
+      }
+
       const archivedEntries = archiveTaskBundle(taskBrief, repoRoot);
 
       return {

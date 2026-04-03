@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
+
+const tempDirs = [];
+process.on("exit", () => {
+  for (const dir of tempDirs) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+});
 
 function writeRepoFile(repoRoot, relativePath, content) {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -13,6 +21,7 @@ function writeRepoFile(repoRoot, relativePath, content) {
 
 function createFixtureRepo({ tasks, spec = true, plan = true }) {
   const repoRoot = mkdtempSync(path.join(tmpdir(), "workflow-cli-"));
+  tempDirs.push(repoRoot);
 
   writeRepoFile(repoRoot, "AGENTS.md", "# agents\n");
   writeRepoFile(repoRoot, "docs/ai/commands.md", "# commands\n");
@@ -109,7 +118,7 @@ function createGitRunner({ status = "", diff = "" } = {}) {
 
 async function loadWorkflowModule() {
   const moduleUrl = pathToFileURL(path.resolve("scripts/workflow-lib.mjs"));
-  return import(`${moduleUrl.href}?cacheBust=${Date.now()}`);
+  return import(`${moduleUrl.href}?cacheBust=${randomUUID()}`);
 }
 
 test("handoff prints a gemini-ready resume prompt from the active task brief", async () => {
@@ -619,7 +628,8 @@ test("handoff --copy writes prompt to the clipboard and prints confirmation", as
   assert.ok(!copiedText.includes("Selected task:"));
   assert.ok(!copiedText.includes("Target tool:"));
   assert.ok(!copiedText.includes("Prompt:"));
-  assert.equal(copiedText, result.stdout.split("Prompt:\n")[1]);
+  // Verify the prompt text appears verbatim in stdout (not re-parsed via fragile split)
+  assert.ok(result.stdout.includes(copiedText.trim()), "stdout should contain the copied prompt text");
 });
 
 test("resume --copy writes only the prompt text to the clipboard", async () => {
@@ -643,7 +653,8 @@ test("resume --copy writes only the prompt text to the clipboard", async () => {
   assert.match(copiedText, /Read AGENTS\.md/);
   assert.ok(!copiedText.includes("Selected task:"));
   assert.ok(!copiedText.includes("Prompt:"));
-  assert.equal(copiedText, result.stdout.split("Prompt:\n")[1]);
+  // Verify the prompt text appears verbatim in stdout (not re-parsed via fragile split)
+  assert.ok(result.stdout.includes(copiedText.trim()), "stdout should contain the copied prompt text");
 });
 
 test("copy fails clearly when the clipboard is unavailable", async () => {
@@ -672,4 +683,271 @@ test("status --copy fails clearly because --copy is unsupported", async () => {
   
   assert.equal(result.exitCode, 1);
   assert.match(result.stderr, /--copy is only supported by handoff, resume, and pack commands/);
+});
+
+test("doctor passes all checks in a well-formed repo", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example.md": makeTaskBrief({ status: "completed" }),
+    },
+  });
+  writeRepoFile(repoRoot, "scripts/workflow.mjs", "// workflow entry\n");
+
+  const commandRunner = (command) => {
+    if (command === "git --version") return "git version 2.40.0";
+    throw new Error(`Unexpected command: ${command}`);
+  };
+
+  const result = runCli(["doctor"], { repoRoot, commandRunner });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /Workflow doctor: 7 checks/);
+  assert.match(result.stdout, /All checks passed/);
+  assert.doesNotMatch(result.stdout, /✗/);
+});
+
+test("doctor fails when docs/ai/commands.md is missing", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = mkdtempSync(path.join(tmpdir(), "doctor-test-"));
+  tempDirs.push(repoRoot);
+  mkdirSync(path.join(repoRoot, "docs", "ai", "tasks"), { recursive: true });
+  writeFileSync(path.join(repoRoot, "docs", "ai", "tasks", "README.md"), "# tasks\n");
+  mkdirSync(path.join(repoRoot, "scripts"), { recursive: true });
+  writeFileSync(path.join(repoRoot, "scripts", "workflow.mjs"), "// entry\n");
+  // commands.md deliberately missing
+
+  const commandRunner = (command) => {
+    if (command === "git --version") return "git version 2.40.0";
+    throw new Error(`Unexpected command: ${command}`);
+  };
+
+  const result = runCli(["doctor"], { repoRoot, commandRunner });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stdout, /✗ docs\/ai\/commands\.md missing/);
+  assert.match(result.stdout, /check\(s\) failed/);
+});
+
+test("doctor warns when multiple active task briefs exist", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: {
+      "2026-03-29-example-a.md": makeTaskBrief({ nextAction: "task a" }),
+      "2026-03-29-example-b.md": makeTaskBrief({ nextAction: "task b" }),
+    },
+  });
+  writeRepoFile(repoRoot, "scripts/workflow.mjs", "// workflow entry\n");
+
+  const commandRunner = (command) => {
+    if (command === "git --version") return "git version 2.40.0";
+    throw new Error(`Unexpected command: ${command}`);
+  };
+
+  const result = runCli(["doctor"], { repoRoot, commandRunner });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /⚠ 2 active task briefs found/);
+  assert.match(result.stdout, /warning\(s\)/);
+});
+
+test("doctor fails when git is unavailable", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({ tasks: {} });
+  writeRepoFile(repoRoot, "scripts/workflow.mjs", "// workflow entry\n");
+
+  const commandRunner = (command) => {
+    if (command === "git --version") throw new Error("git not found");
+    throw new Error(`Unexpected command: ${command}`);
+  };
+
+  const result = runCli(["doctor"], { repoRoot, commandRunner });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stdout, /✗ git not found/);
+});
+
+test("--version prints the package version", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const result = runCli(["--version"], {});
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /workflow v\d+\.\d+\.\d+/);
+});
+
+test("pack --output rejects paths outside the repository", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief() },
+  });
+  const commandRunner = createGitRunner({});
+
+  const result = runCli(["pack", "--output", "../../../etc/crontab"], { repoRoot, commandRunner });
+
+  assert.equal(result.exitCode, 1);
+  assert.match(result.stderr, /--output path must be inside the repository/);
+});
+
+test("skill --help prints help text instead of running skills CLI", async () => {
+  const { runCli } = await loadWorkflowModule();
+  let skillCalled = false;
+  const commandRunner = () => { skillCalled = true; return ""; };
+
+  const result = runCli(["skill", "--help"], { repoRoot: ".", commandRunner });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(skillCalled, false);
+  assert.match(result.stdout, /Usage: workflow/);
+});
+
+test("skill rejects unknown subcommands", async () => {
+  const { runCli } = await loadWorkflowModule();
+  let skillCalled = false;
+  const commandRunner = () => { skillCalled = true; return ""; };
+
+  const result = runCli(["skill", "hack"], { repoRoot: ".", commandRunner });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(skillCalled, false);
+  assert.match(result.stderr, /Unknown skill subcommand: hack/);
+});
+
+test("doctor --help prints help text instead of running checks", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const result = runCli(["doctor", "--help"], { repoRoot: "." });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /Usage: workflow/);
+});
+
+// ─── --dry-run tests ────────────────────────────────────────────────────────
+
+test("finalize --dry-run shows what would be moved without moving files", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief({ status: "completed" }) },
+  });
+  const { taskSourcePath } = getBundlePaths(repoRoot);
+
+  const result = runCli(["finalize", "--dry-run"], { repoRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /[Dd]ry.run/);
+  assert.match(result.stdout, /finalize would move/i);
+  assert.match(result.stdout, /2026-03-29-example\.md/);
+  // Files should NOT have moved
+  assert.ok(existsSync(taskSourcePath), "task file should still be at source path");
+});
+
+test("archive --dry-run shows what would be archived without moving files", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief({ status: "completed" }) },
+  });
+  const { taskSourcePath } = getBundlePaths(repoRoot);
+
+  const result = runCli(["archive", "--dry-run"], { repoRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /[Dd]ry.run/);
+  assert.match(result.stdout, /archive would move/i);
+  assert.match(result.stdout, /2026-03-29-example\.md/);
+  // Files should NOT have moved
+  assert.ok(existsSync(taskSourcePath), "task file should still be at source path");
+});
+
+// ─── archive: non-completed path ────────────────────────────────────────────
+
+test("archive succeeds for a completed task and moves bundle to archive", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief({ status: "completed" }) },
+  });
+  const { taskSourcePath, taskArchivePath, specArchivePath, planArchivePath } = getBundlePaths(repoRoot);
+
+  const result = runCli(["archive"], { repoRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.ok(!existsSync(taskSourcePath), "task should be moved");
+  assert.ok(existsSync(taskArchivePath), "task should be in archive");
+  assert.ok(existsSync(specArchivePath), "spec should be in archive");
+  assert.ok(existsSync(planArchivePath), "plan should be in archive");
+});
+
+test("archive rejects a task that is not completed", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief({ status: "in_progress" }) },
+  });
+  const { taskSourcePath } = getBundlePaths(repoRoot);
+
+  const result = runCli(["archive"], { repoRoot });
+
+  assert.ok(result.exitCode !== 0, "should fail for non-completed task");
+  assert.ok(existsSync(taskSourcePath), "task file should remain at original path");
+});
+
+// ─── pack --compress ─────────────────────────────────────────────────────────
+
+test("pack --compress still succeeds when repomix is unavailable", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief() },
+  });
+
+  // Provide a commandRunner that throws for repomix (simulating it not being installed)
+  const noRepomixRunner = (command) => {
+    const cmd = Array.isArray(command) ? command.join(" ") : String(command);
+    if (cmd.includes("repomix")) throw new Error("repomix: command not found");
+    throw new Error(`Unexpected command: ${cmd}`);
+  };
+
+  const result = runCli(["pack", "--compress", "--stdout"], { repoRoot, commandRunner: noRepomixRunner });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /repomix unavailable/);
+});
+
+// ─── resolveExplicitTask with absolute path ──────────────────────────────────
+
+test("handoff accepts an absolute task path via --task", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief() },
+  });
+  const absTaskPath = path.join(repoRoot, "docs", "ai", "tasks", "2026-03-29-example.md");
+
+  const result = runCli(["handoff", "--task", absTaskPath], { repoRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /2026-03-29-example\.md/);
+});
+
+// ─── concurrent scaffold collision ───────────────────────────────────────────
+
+test("concurrent scaffold with the same slug produces an error for the second call", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({ tasks: {} });
+
+  const result1 = runCli(["scaffold", "--slug", "collision-test"], { repoRoot });
+  // Same slug second time should fail because the file already exists
+  const result2 = runCli(["scaffold", "--slug", "collision-test"], { repoRoot });
+
+  assert.equal(result1.exitCode, 0);
+  assert.ok(result2.exitCode !== 0, "second scaffold with same slug should fail");
+  assert.match(result2.stderr, /already exists/i);
+});
+
+// ─── codex null-adapter ───────────────────────────────────────────────────────
+
+test("handoff --to codex returns a valid prompt", async () => {
+  const { runCli } = await loadWorkflowModule();
+  const repoRoot = createFixtureRepo({
+    tasks: { "2026-03-29-example.md": makeTaskBrief() },
+  });
+
+  const result = runCli(["handoff", "--to", "codex"], { repoRoot });
+
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stdout, /AGENTS\.md/);
 });

@@ -36,6 +36,31 @@ These are the highest-value files to keep current:
 - necessary only if you want workspace customization: `.agent/rules/`
 - optional but useful: `.agent/workflows/`
 
+### Cursor
+
+- necessary: `.cursor/rules/repository-playbook.mdc` (`alwaysApply: true` — auto-loaded on every session)
+- thin adapter: points to `AGENTS.md` as canonical playbook and lists all workflow CLI commands
+
+### Windsurf
+
+- necessary: `.windsurfrules` at the repo root (auto-loaded by Windsurf on every session)
+- same content as the Cursor rule, plain markdown without MDC frontmatter
+
+### Aider
+
+- necessary if you want automatic context injection: `.aider.conf.yml`
+- auto-includes `AGENTS.md`, `docs/ai/commands.md`, and `docs/ai/standards.md` as read-only context via the `read:` key
+
+### Continue
+
+- optional: `.continue/config.json`
+- adds a `/workflow` custom slash command that prompts the model to load `AGENTS.md` and `docs/ai/commands.md`
+
+### Zed
+
+- no per-project AI instructions convention established yet
+- point Zed's AI assistant to `AGENTS.md` manually when starting a task
+
 ## Shared subagent files
 
 These are optional for simple repos, but useful when you want repeatable multi-agent coordination:
@@ -47,6 +72,15 @@ These are optional for simple repos, but useful when you want repeatable multi-a
 - `docs/ai/subagents/reviewer.md`
 - `docs/ai/subagents/tester.md`
 - `docs/ai/tasks/TEMPLATE.md`
+
+## Agent skills layer
+
+These files make Nimblco's workflow guidance installable into any agent tool that supports the agentskills.io spec:
+
+- `skills/`: four skills (`workflow`, `docs`, `scripts`, `subagents`) with agentskills.io-compliant `SKILL.md` frontmatter; install into any compatible tool via `npx skills add Nimblco/nimblco` or `pnpm workflow skill add Nimblco/nimblco`
+- `.claude-plugin/marketplace.json`: Claude Code plugin marketplace descriptor; enables `/plugin marketplace add Nimblco/nimblco` discovery in Claude Code
+
+Compatible tools include Claude Code, GitHub Copilot (via agent mode), Cursor, Windsurf, and any other tool that reads the agentskills.io `skills/` discovery convention.
 
 ## Unnecessary or removed
 

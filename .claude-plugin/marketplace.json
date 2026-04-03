@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "pluginRoot": "."
+  },
+  "plugins": [
+    {
+      "name": "nimblco-workflow",
+      "source": ".",
+      "skills": [
+        "./skills/workflow",
+        "./skills/docs",
+        "./skills/scripts",
+        "./skills/subagents"
+      ]
+    }
+  ]
+}
