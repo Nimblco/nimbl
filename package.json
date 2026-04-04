@@ -1,6 +1,6 @@
 {
   "name": "nimblco",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Portable agentic coding workflow layer. Embed into any repo to give AI coding agents structured task briefs, specs, plans, and handoff packs.",
   "license": "MIT",
   "keywords": [

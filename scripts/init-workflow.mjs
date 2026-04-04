@@ -136,6 +136,29 @@ async function copyLayer(targetDir, force = false, nonInteractive = false, inclu
     process.exit(1);
   }
 
+  // Early permission check — create then remove a probe directory so the
+  // user gets a clear error before answering all the interactive prompts.
+  try {
+    await fs.mkdir(targetRoot, { recursive: true });
+    // Remove only if we just created an empty dir (don't wipe existing work)
+    const entries = await fs.readdir(targetRoot);
+    if (entries.length === 0) await fs.rmdir(targetRoot);
+  } catch (err) {
+    const isPermission = err.code === "EPERM" || err.code === "EACCES";
+    console.error("");
+    if (isPermission) {
+      console.error(`  ${c.red}✖ Permission denied: cannot write to${c.reset}`);
+      console.error(`    ${c.bold}${targetRoot}${c.reset}`);
+      console.error("");
+      console.error(`  ${c.yellow}Tip:${c.reset} Use a path inside your home folder, e.g.:`);
+      console.error(`    ${c.green}npx nimblco .\\${path.basename(targetRoot)}${c.reset}   (creates it here in the current folder)`);
+    } else {
+      console.error(`  ${c.red}✖ Cannot create target directory: ${err.message}${c.reset}`);
+    }
+    console.error("");
+    process.exit(1);
+  }
+
   // CLI Header
   printBanner();
   console.log(`  ${c.dim}Target Repository:${c.reset}  ${targetRoot}`);
@@ -208,10 +231,11 @@ async function copyLayer(targetDir, force = false, nonInteractive = false, inclu
   }
   console.log("");
 
-  await fs.mkdir(targetRoot, { recursive: true });
+  await fs.mkdir(targetRoot, { recursive: true }).catch(() => { /* already exists or created above */ });
 
   console.log("");
   console.log(`  ${c.bold}Executing Scaffold Phase:${c.reset}`);
+
   
   let copiedCount = 0;
   let skippedCount = 0;
@@ -978,6 +1002,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  main,
   resolveCorePaths,
   injectGitignoreEntries,
   injectScriptsToPackageJson,
